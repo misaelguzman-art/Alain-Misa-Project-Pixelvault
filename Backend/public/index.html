@@ -376,6 +376,10 @@
                 <input type="email" id="reg-email" class="input w-full" placeholder="ejemplo@correo.com">
             </div>
             <div class="mb-1">
+                <label class="label">Contraseña *</label>
+                <input type="password" id="reg-contrasena" class="input w-full" placeholder="Crea tu contraseña">
+            </div>
+            <div class="mb-1">
                 <label class="label">Teléfono</label>
                 <input type="text" id="reg-telefono" class="input w-full" placeholder="Ej: 59171234567">
             </div>
@@ -397,10 +401,14 @@
     <section id="sec-login" class="login-section hidden">
         <div class="login-card">
             <h2 class="text-center">Iniciar Sesión</h2>
-            <p class="text-center mb-2">Ingresa tu correo electrónico</p>
-            <div class="mb-2">
+            <p class="text-center mb-2">Ingresa tus credenciales</p>
+            <div class="mb-1">
                 <label class="label">Correo electrónico</label>
                 <input type="email" id="login-email" class="input w-full" placeholder="ejemplo@correo.com">
+            </div>
+            <div class="mb-2">
+                <label class="label">Contraseña</label>
+                <input type="password" id="login-contrasena" class="input w-full" placeholder="Tu contraseña">
             </div>
             <button class="btn btn-primario btn-full" onclick="loginPorEmail()">Entrar →</button>
             <div class="text-center mt-2">
@@ -480,22 +488,241 @@
         </div>
     </section>
 
-    <!-- PANEL ADMIN (igual que antes) -->
+    <!-- ========== PANEL VENDEDOR ========== -->
+    <section id="sec-vendedor" class="hidden">
+        <div class="contenedor">
+            <div class="encabezado-seccion mb-2 flex between center" style="border-bottom: 1px solid var(--borde); padding-bottom: 1rem;">
+                <div>
+                    <h3 style="font-family: 'Bebas Neue', sans-serif; font-size: 2rem; background: linear-gradient(135deg, var(--blanco), var(--acento2)); -webkit-background-clip: text; background-clip: text; color: transparent;">Panel del Vendedor</h3>
+                    <p style="color: var(--texto-sec); font-size: 0.9rem;">Consulta de productos y control de existencias en almacén</p>
+                </div>
+                <button class="btn btn-peligro" onclick="cerrarSesion()">Salir</button>
+            </div>
+            
+            <div class="panel mt-2">
+                <div class="panel-header flex between center">
+                    <h4>📦 Control de Stock e Inventario</h4>
+                    <button class="btn btn-secundario" onclick="cargarInventarioVendedor()">🔄 Actualizar Tabla</button>
+                </div>
+                <div class="panel-body" style="overflow-x:auto">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>ID Inventario</th>
+                                <th>Producto / Juego</th>
+                                <th>Tipo</th>
+                                <th>Edición</th>
+                                <th>Stock Actual</th>
+                                <th>Nuevo Stock</th>
+                                <th style="text-align: center;">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vendedor-inventario-body">
+                            <tr><td colspan="7" style="padding:2rem;text-align:center">Cargando inventario...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== PANEL ADMIN (Pestañas avanzadas) ========== -->
     <section id="sec-admin" class="hidden">
         <div class="contenedor">
-            <div class="admin-grid">
-                <div class="panel report-card" onclick="cargarReporte('juegos/stock-bajo')"><div class="icon">⚠️</div><div class="fw-600">Stock Bajo</div><div class="texto-sec">Menos de 10 unidades</div></div>
-                <div class="panel report-card" onclick="cargarReporte('reportes/ingresos-pedidos')"><div class="icon">💰</div><div class="fw-600">Ingresos por Pedido</div><div class="texto-sec">Reporte de ventas</div></div>
-                <div class="panel report-card" onclick="cargarReporte('reportes/directorio-clientes')"><div class="icon">👥</div><div class="fw-600">Directorio Clientes</div><div class="texto-sec">Listado completo</div></div>
+            <div class="encabezado-seccion mb-2 flex between center" style="border-bottom: 1px solid var(--borde); padding-bottom: 1rem;">
+                <div>
+                    <h3 style="font-family: 'Bebas Neue', sans-serif; font-size: 2.2rem; background: linear-gradient(135deg, var(--blanco), var(--acento2)); -webkit-background-clip: text; background-clip: text; color: transparent;">Panel de Administración</h3>
+                    <p style="color: var(--texto-sec); font-size: 0.9rem;">Reportes globales, gestión de catálogo (CRUD), auditoría y stock</p>
+                </div>
+                <button class="btn btn-peligro" onclick="cerrarSesion()">Salir</button>
             </div>
-            <div class="admin-grid">
-                <div class="panel report-card" onclick="cargarReporte('reportes/ventas-por-juego')"><div class="icon">🎮💰</div><div class="fw-600">Ingresos por Juego</div><div class="texto-sec">Total por producto</div></div>
-                <div class="panel report-card" onclick="cargarReporte('reportes/catalogo-jerarquia')"><div class="icon">📋</div><div class="fw-600">Catálogo Jerárquico</div><div class="texto-sec">Juegos, ediciones y DLCs</div></div>
-                <div class="panel report-card" onclick="cargarReporte('reportes/productos-abandonados')"><div class="icon">🛒❌</div><div class="fw-600">Productos Abandonados</div><div class="texto-sec">Más retirados</div></div>
+
+            <div class="tabs">
+                <button class="tab active" id="tab-admin-reportes" onclick="cambiarPestanaAdmin('reportes', this)">📊 Reportes</button>
+                <button class="tab" id="tab-admin-crud" onclick="cambiarPestanaAdmin('crud', this)">⚙️ Gestión Catálogo</button>
+                <button class="tab" id="tab-admin-inventario" onclick="cambiarPestanaAdmin('inventario', this)">📦 Control Inventario</button>
             </div>
-            <div class="panel mt-2">
-                <div class="panel-header"><h4>Resultados</h4><button class="btn btn-secundario" onclick="limpiarTablaAdmin()">Limpiar</button></div>
-                <div class="panel-body" style="overflow-x:auto"><table class="report-table" id="report-table"><thead id="report-head"></thead><tbody id="report-body"><tr><td style="padding:2rem;text-align:center">Selecciona un reporte</td></tr></tbody></table></div>
+
+            <!-- SUB-PANEL: REPORTES -->
+            <div id="pestana-admin-reportes">
+                <div class="admin-grid">
+                    <div class="panel report-card" onclick="cargarReporte('juegos/stock-bajo')"><div class="icon">⚠️</div><div class="fw-600">Stock Bajo</div><div class="texto-sec">Menos de 10 unidades</div></div>
+                    <div class="panel report-card" onclick="cargarReporte('reportes/ingresos-pedidos')"><div class="icon">💰</div><div class="fw-600">Ingresos por Pedido</div><div class="texto-sec">Reporte de ventas</div></div>
+                    <div class="panel report-card" onclick="cargarReporte('reportes/directorio-clientes')"><div class="icon">👥</div><div class="fw-600">Directorio Clientes</div><div class="texto-sec">Listado completo</div></div>
+                </div>
+                <div class="admin-grid">
+                    <div class="panel report-card" onclick="cargarReporte('reportes/ventas-por-juego')"><div class="icon">🎮💰</div><div class="fw-600">Ingresos por Juego</div><div class="texto-sec">Total por producto</div></div>
+                    <div class="panel report-card" onclick="cargarReporte('reportes/catalogo-jerarquia')"><div class="icon">📋</div><div class="fw-600">Catálogo Jerárquico</div><div class="texto-sec">Juegos, ediciones y DLCs</div></div>
+                    <div class="panel report-card" onclick="cargarReporte('reportes/productos-abandonados')"><div class="icon">🛒❌</div><div class="fw-600">Productos Abandonados</div><div class="texto-sec">Más retirados</div></div>
+                </div>
+                <div class="admin-grid">
+                    <div class="panel report-card" onclick="cargarReporte('reportes/auditoria')" style="grid-column: span 3; border-color: var(--acento); background: rgba(124,58,237,0.05);"><div class="icon">🔍</div><div class="fw-600" style="color: var(--acento2);">Auditoría del Sistema</div><div class="texto-sec">Historial de triggers (Products, Inventario, Pedidos)</div></div>
+                </div>
+                <div class="panel mt-2">
+                    <div class="panel-header"><h4>Resultados</h4><button class="btn btn-secundario" onclick="limpiarTablaAdmin()">Limpiar</button></div>
+                    <div class="panel-body" style="overflow-x:auto"><table class="report-table" id="report-table"><thead id="report-head"></thead><tbody id="report-body"><tr><td style="padding:2rem;text-align:center">Selecciona un reporte</td></tr></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- SUB-PANEL: CRUD Y VINCULACIONES -->
+            <div id="pestana-admin-crud" class="hidden">
+                <div class="cliente-grid">
+                    <!-- Columna Izquierda: Formularios -->
+                    <div class="sidebar" style="gap: 1.5rem;">
+                        <!-- Crear Producto -->
+                        <div class="panel">
+                            <div class="panel-header"><h4>🎮 Crear Producto</h4></div>
+                            <div class="panel-body col flex gap-1">
+                                <div>
+                                    <label class="label">Nombre del Producto *</label>
+                                    <input type="text" id="crud-prod-name" class="input w-full" placeholder="Ej: Cyberpunk 2077: Phantom Liberty">
+                                </div>
+                                <div>
+                                    <label class="label">Desarrollador (Developer) *</label>
+                                    <select id="crud-prod-dev" class="select w-full"><option value="">Cargando desarrolladores...</option></select>
+                                </div>
+                                <div>
+                                    <label class="label">Tipo de Producto *</label>
+                                    <select id="crud-prod-tipo" class="select w-full" onchange="toggleJuegoBaseSelector()">
+                                        <option value="juego">Juego Base</option>
+                                        <option value="dlc">DLC</option>
+                                        <option value="complemento">Complemento</option>
+                                    </select>
+                                </div>
+                                <div id="crud-prod-base-container" style="display:none;">
+                                    <label class="label">Juego Base Asociado</label>
+                                    <select id="crud-prod-base" class="select w-full"><option value="">Selecciona juego base...</option></select>
+                                </div>
+                                <div>
+                                    <label class="label">Precio Base ($) (Opcional para juegos base)</label>
+                                    <input type="number" step="0.01" id="crud-prod-precio" class="input w-full" placeholder="Ej: 29.99">
+                                </div>
+                                <div>
+                                    <label class="label">Fecha de Lanzamiento</label>
+                                    <input type="date" id="crud-prod-fecha" class="input w-full">
+                                </div>
+                                <button class="btn btn-primario btn-full mt-1" onclick="crearProductoAdmin()">Crear Producto →</button>
+                            </div>
+                        </div>
+
+                        <!-- Unir Producto con Edición -->
+                        <div class="panel">
+                            <div class="panel-header"><h4>🔗 Unir Producto con Edición</h4></div>
+                            <div class="panel-body col flex gap-1">
+                                <div>
+                                    <label class="label">Juego Base *</label>
+                                    <select id="crud-union-juego" class="select w-full"><option value="">Cargando juegos...</option></select>
+                                </div>
+                                <div>
+                                    <label class="label">Edición *</label>
+                                    <select id="crud-union-edicion" class="select w-full"><option value="">Cargando ediciones...</option></select>
+                                </div>
+                                <div>
+                                    <label class="label">Precio para esta Edición ($) *</label>
+                                    <input type="number" step="0.01" id="crud-union-precio" class="input w-full" placeholder="Ej: 59.99">
+                                </div>
+                                <div>
+                                    <label class="label">Fecha Lanzamiento Edición *</label>
+                                    <input type="date" id="crud-union-fecha" class="input w-full">
+                                </div>
+                                <button class="btn btn-primario btn-full mt-1" onclick="unirProductoEdicionAdmin()">Vincular Edición →</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Columna Derecha: Toggles y Listados rápidos -->
+                    <div class="sidebar" style="gap: 1.5rem;">
+                        <!-- Listado de Productos (Toggle Activo/Inactivo) -->
+                        <div class="panel">
+                            <div class="panel-header"><h4>📋 Listado de Productos</h4></div>
+                            <div class="panel-body" style="max-height: 250px; overflow-y: auto;" id="crud-lista-productos">
+                                <div class="text-center">Cargando productos...</div>
+                            </div>
+                        </div>
+
+                        <!-- Métodos de Pago -->
+                        <div class="panel">
+                            <div class="panel-header"><h4>💳 Métodos de Pago del Sistema</h4></div>
+                            <div class="panel-body col flex gap-1">
+                                <div class="flex gap-1">
+                                    <input type="text" id="crud-pago-nombre" class="input w-full" placeholder="Nombre de método (ej: Binance Pay)">
+                                    <button class="btn btn-primario" onclick="crearMetodoPagoAdmin()">Crear</button>
+                                </div>
+                                <div class="divider"></div>
+                                <div style="max-height: 150px; overflow-y: auto;" id="crud-lista-pagos"></div>
+                            </div>
+                        </div>
+
+                        <!-- Promociones -->
+                        <div class="panel">
+                            <div class="panel-header"><h4>🏷️ Promociones</h4></div>
+                            <div class="panel-body col flex gap-1">
+                                <div>
+                                    <label class="label">Nombre de la Promoción</label>
+                                    <input type="text" id="crud-promo-nombre" class="input w-full" placeholder="Ej: Oferta de Invierno">
+                                </div>
+                                <div class="flex gap-1">
+                                    <div class="flex-1">
+                                        <label class="label">Dto (%)</label>
+                                        <input type="number" id="crud-promo-desc" class="input w-full" placeholder="20">
+                                    </div>
+                                    <div class="flex-1">
+                                        <label class="label">F. Inicio</label>
+                                        <input type="date" id="crud-promo-inicio" class="input w-full">
+                                    </div>
+                                    <div class="flex-1">
+                                        <label class="label">F. Fin</label>
+                                        <input type="date" id="crud-promo-fin" class="input w-full">
+                                    </div>
+                                </div>
+                                <button class="btn btn-primario btn-full mt-1" onclick="crearPromocionAdmin()">Crear Promoción</button>
+                                <div class="divider"></div>
+                                <div style="max-height: 150px; overflow-y: auto;" id="crud-lista-promociones"></div>
+                            </div>
+                        </div>
+
+                        <!-- Ediciones -->
+                        <div class="panel">
+                            <div class="panel-header"><h4>🛡️ Ediciones del Sistema</h4></div>
+                            <div class="panel-body col flex gap-1">
+                                <div class="flex gap-1">
+                                    <input type="text" id="crud-ed-nombre" class="input w-full" placeholder="Ej: GOTY Edition">
+                                    <button class="btn btn-primario" onclick="crearEdicionAdmin()">Crear</button>
+                                </div>
+                                <div class="divider"></div>
+                                <div style="max-height: 150px; overflow-y: auto;" id="crud-lista-ediciones"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUB-PANEL: INVENTARIO (Común Admin) -->
+            <div id="pestana-admin-inventario" class="hidden">
+                <div class="panel">
+                    <div class="panel-header flex between center">
+                        <h4>📦 Control General de Stock</h4>
+                        <button class="btn btn-secundario" onclick="cargarInventarioAdmin()">🔄 Actualizar Tabla</button>
+                    </div>
+                    <div class="panel-body" style="overflow-x:auto">
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>ID Inventario</th>
+                                    <th>Producto / Juego</th>
+                                    <th>Tipo</th>
+                                    <th>Edición</th>
+                                    <th>Stock Actual</th>
+                                    <th>Nuevo Stock</th>
+                                    <th style="text-align: center;">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-inventario-body">
+                                <tr><td colspan="7" style="padding:2rem;text-align:center">Cargando inventario...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </section>

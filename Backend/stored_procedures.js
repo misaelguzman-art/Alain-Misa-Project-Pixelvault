@@ -8,7 +8,7 @@ const { sql, poolPromise } = require('./database');
 
 // 1. Registrar nuevo cliente
 router.post('/clientes', async (req, res) => {
-    const { nombre, medio, apellido, correo, paisid, numero_contacto } = req.body;
+    const { nombre, medio, apellido, correo, paisid, numero_contacto, contrasena } = req.body;
     try {
         const pool = await poolPromise;
         await pool.request()
@@ -18,6 +18,7 @@ router.post('/clientes', async (req, res) => {
             .input('correo', sql.VarChar(50), correo)
             .input('paisid', sql.Int, paisid)
             .input('numero_contacto', sql.VarChar(20), numero_contacto)
+            .input('contrasena', sql.VarChar(255), contrasena || '12345')
             .execute('AgregarCliente');
         res.status(201).json({ mensaje: "Cliente registrado con éxito" });
     } catch (err) {
@@ -333,8 +334,9 @@ router.post('/pedidos/aplicar-promocion', async (req, res) => {
 // ============================================================
 
 // 19. Login por email
+// 19. Login por email y contraseña
 router.post('/login', async (req, res) => {
-    const { email } = req.body;
+    const { email, contrasena } = req.body;
     if (!email) {
         return res.status(400).json({ error: 'Email requerido' });
     }
@@ -342,13 +344,13 @@ router.post('/login', async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request()
             .input('email', sql.VarChar(50), email)
+            .input('contrasena', sql.VarChar(255), contrasena || null)
             .execute('LoginCliente');
         if (result.recordset.length === 0) {
-            return res.status(404).json({ error: 'Cliente no encontrado o cuenta inactiva' });
+            return res.status(404).json({ error: 'Usuario o contraseña incorrectos, o cuenta inactiva' });
         }
         const usuario = result.recordset[0];
-        const esAdmin = (email === 'admin@gmail.com');
-        usuario.rol = esAdmin ? 'admin' : 'cliente';
+        // Mantener compatibilidad pero usar el rol y datos reales del usuario
         res.json(usuario);
     } catch (err) {
         console.error('Error en /login:', err);
@@ -369,7 +371,7 @@ router.get('/paises', async (req, res) => {
 });
 
 // ============================================================
-// REPORTES ADMIN
+// REPORTES ADMIN Y AUDITORÍA
 // ============================================================
 
 // 21. Directorio de clientes
@@ -427,6 +429,17 @@ router.get('/reportes/productos-abandonados', async (req, res) => {
     }
 });
 
+// 26. Reporte de Auditoría
+router.get('/reportes/auditoria', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT * FROM dbo.Auditoria ORDER BY fecha DESC');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ============================================================
 // HISTORIAL COMPLETO DE PEDIDOS (todos los estados)
 // ============================================================
@@ -443,6 +456,284 @@ router.get('/clientes/:id/pedidos', async (req, res) => {
                 WHERE Id_cliente = @clienteid
                 ORDER BY fecha_del_pedido DESC
             `);
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================================
+// ENTREGA DE PEDIDOS Y GESTIÓN DE STOCK
+// ============================================================
+
+// Entregar Pedido (pendiente -> entregado)
+router.put('/pedidos/:id/entregar', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('pedido_id', sql.Int, req.params.id)
+            .execute('dbo.EntregarPedido');
+        res.json({ mensaje: "Pedido entregado con éxito." });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Actualizar Stock de Inventario (Vendedor y Admin)
+router.put('/inventario/stock', async (req, res) => {
+    const { productid, edicionproductid, cantidad } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('productid', sql.Int, productid || null)
+            .input('edicionproductid', sql.Int, edicionproductid || null)
+            .input('cantidad', sql.Int, cantidad)
+            .execute('dbo.ActualizarInventarioStock');
+        res.json({ mensaje: "Stock de inventario actualizado con éxito." });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Obtener Lista de Inventario para Gestión de Stock
+router.get('/inventario/lista', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT 
+                i.inventoryid,
+                COALESCE(p_ed.name, p_direct.name) AS nombre_producto,
+                COALESCE(p_ed.tipo_juego, p_direct.tipo_juego) AS tipo_juego,
+                ed.name AS nombre_edicion,
+                i.cantidad,
+                i.productid,
+                i.edicionproductid
+            FROM Product.Inventario i
+            LEFT JOIN Product.Product p_direct ON i.productid = p_direct.productid
+            LEFT JOIN Product.EdicionProduct ep ON i.edicionproductid = ep.edicionproductid
+            LEFT JOIN Product.Product p_ed ON ep.productid = p_ed.productid
+            LEFT JOIN Product.Edicion ed ON ep.edicionid = ed.edicionid
+            ORDER BY nombre_producto, nombre_edicion
+        `);
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================================
+// RUTAS CRUD ADMINISTRADOR
+// ============================================================
+
+// 1. Crear producto
+router.post('/admin/productos', async (req, res) => {
+    const { name, developerid, tipo_juego, juego_base, precio_base, fecha_de_lanzamiento } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('name', sql.VarChar(50), name)
+            .input('developerid', sql.Int, developerid)
+            .input('tipo_juego', sql.VarChar(20), tipo_juego || 'juego')
+            .input('juego_base', sql.Int, juego_base || null)
+            .input('precio_base', sql.Decimal(10, 2), precio_base || null)
+            .input('fecha_de_lanzamiento', sql.Date, fecha_de_lanzamiento || null)
+            .execute('dbo.CrearProductoAdmin');
+        res.status(201).json({ mensaje: "Producto creado con éxito." });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. Activar / Desactivar producto
+router.put('/admin/productos/:id/estado', async (req, res) => {
+    const { estado } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('productid', sql.Int, req.params.id)
+            .input('estado', sql.VarChar(20), estado)
+            .execute('dbo.DesactivarProductoAdmin');
+        res.json({ mensaje: "Estado del producto actualizado con éxito." });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3. Crear método de pago
+router.post('/admin/pagos', async (req, res) => {
+    const { nombre } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('nombre', sql.VarChar(30), nombre)
+            .execute('dbo.CrearMetodoPagoAdmin');
+        res.status(201).json({ mensaje: "Método de pago creado con éxito." });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 4. Activar / Desactivar método de pago
+router.put('/admin/pagos/:id/estado', async (req, res) => {
+    const { estado } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('id_metodo', sql.Int, req.params.id)
+            .input('estado', sql.VarChar(20), estado)
+            .execute('dbo.DesactivarMetodoPagoAdmin');
+        res.json({ mensaje: "Estado del método de pago actualizado." });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 5. Crear promoción
+router.post('/admin/promociones', async (req, res) => {
+    const { nombre, descuento, fecha_inicio, fecha_fin } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('nombre', sql.VarChar(50), nombre)
+            .input('descuento', sql.Decimal(5, 2), descuento)
+            .input('fecha_inicio', sql.Date, fecha_inicio)
+            .input('fecha_fin', sql.Date, fecha_fin)
+            .execute('dbo.CrearPromocionAdmin');
+        res.status(201).json({ mensaje: "Promoción creada con éxito." });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 6. Activar / Desactivar promoción
+router.put('/admin/promociones/:id/estado', async (req, res) => {
+    const { estado } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('promocionid', sql.Int, req.params.id)
+            .input('estado', sql.VarChar(20), estado)
+            .execute('dbo.DesactivarPromocionAdmin');
+        res.json({ mensaje: "Estado de la promoción actualizado." });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 7. Crear edición
+router.post('/admin/ediciones', async (req, res) => {
+    const { name } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('name', sql.VarChar(20), name)
+            .execute('dbo.CrearEdicionAdmin');
+        res.status(201).json({ mensaje: "Edición creada con éxito." });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 8. Activar / Desactivar edición
+router.put('/admin/ediciones/:id/estado', async (req, res) => {
+    const { estado } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('edicionid', sql.Int, req.params.id)
+            .input('estado', sql.VarChar(20), estado)
+            .execute('dbo.DesactivarEdicionAdmin');
+        res.json({ mensaje: "Estado de la edición actualizado." });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 9. Unir producto con edición
+router.post('/admin/productos-ediciones', async (req, res) => {
+    const { productid, edicionid, precio, fecha_lanzamiento } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('productid', sql.Int, productid)
+            .input('edicionid', sql.Int, edicionid)
+            .input('precio', sql.Decimal(10, 2), precio)
+            .input('fecha_lanzamiento', sql.Date, fecha_lanzamiento)
+            .execute('dbo.UnirProductoEdicion');
+        res.status(201).json({ mensaje: "Edición vinculada al producto correctamente." });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================================
+// RUTAS AUXILIARES COMBOS ADMIN
+// ============================================================
+
+router.get('/developers', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT developerid, name FROM Product.Developer ORDER BY name');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/categorias', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT id_categoria, nombre FROM Product.Categoria ORDER BY nombre');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/plataformas', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT id_plataforma, nombre FROM Product.Plataforma ORDER BY nombre');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/ediciones/lista', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT edicionid, name, estado FROM Product.Edicion ORDER BY name');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/productos/lista', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query("SELECT productid, name, estado FROM Product.Product WHERE tipo_juego = 'juego' ORDER BY name");
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/promociones/lista', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query("SELECT promocionid, nombre, descuento, fecha_inicio, fecha_fin, estado FROM Marketing.Promocion ORDER BY nombre");
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/pagos/lista', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query("SELECT id_metodo, nombre, estado FROM Metodo_Pago ORDER BY nombre");
         res.json(result.recordset);
     } catch (err) {
         res.status(500).json({ error: err.message });
