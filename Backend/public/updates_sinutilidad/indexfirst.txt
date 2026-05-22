@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tienda BD2 - MVP</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --primary-color: #2c3e50; --secondary-color: #34495e; }
+        body { background-color: #f4f7f6; }
+        .navbar { background-color: var(--primary-color); }
+        .hidden { display: none !important; }
+        .card-stat { border-left: 5px solid #3498db; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark mb-4">
+    <div class="container">
+        <a class="navbar-brand" href="#" onclick="showSection('inicio')">Tienda Gamer</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav ms-auto" id="nav-menu">
+                </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+    <section id="sec-login" class="row justify-content-center">
+        <div class="col-md-4">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h3 class="text-center mb-4">Iniciar Sesión</h3>
+                    <div class="mb-3">
+                        <label>ID de Usuario (Simulado)</label>
+                        <input type="number" id="login-id" class="form-control" placeholder="Ej: 1">
+                    </div>
+                    <div class="mb-3">
+                        <label>Rol</label>
+                        <select id="login-rol" class="form-select">
+                            <option value="cliente">Cliente</option>
+                            <option value="admin">Administrador</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary w-100" onclick="login()">Entrar</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="sec-admin" class="hidden">
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card card-stat p-3 shadow-sm" onclick="cargarReporte('juegos/stock-bajo')" style="cursor:pointer">
+                    <h5>⚠️ Stock Bajo</h5>
+                    <p class="text-muted">Ver juegos con menos de 10 unidades</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card card-stat p-3 shadow-sm" onclick="cargarReporte('reportes/ingresos-pedidos')" style="cursor:pointer">
+                    <h5>💰 Ingresos</h5>
+                    <p class="text-muted">Reporte detallado de ventas</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card card-stat p-3 shadow-sm" onclick="cargarReporte('reportes/directorio-clientes')" style="cursor:pointer">
+                    <h5>👥 Clientes</h5>
+                    <p class="text-muted">Directorio completo por país</p>
+                </div>
+            </div>
+        </div>
+        <div class="card shadow">
+            <div class="card-header bg-white"><strong>Resultados del Reporte</strong></div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="tabla-reportes">
+                        <thead id="tabla-head"></thead>
+                        <tbody id="tabla-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="sec-cliente" class="hidden">
+        <div class="row">
+            <div class="col-md-8">
+                <h4>Catálogo de Juegos</h4>
+                <div class="row" id="catalogo-container"></div>
+            </div>
+            <div class="col-md-4">
+                <h4>Mis Métodos de Pago</h4>
+                <ul class="list-group" id="lista-pagos"></ul>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+    const API_BASE = 'http://localhost:3000/api';
+    let currentUser = null;
+
+    // --- LÓGICA DE LOGIN ---
+    function login() {
+        const id = document.getElementById('login-id').value;
+        const rol = document.getElementById('login-rol').value;
+
+        if(!id) return alert("Ingresa un ID");
+
+        currentUser = { id, rol };
+        renderMenu();
+        showSection(rol === 'admin' ? 'admin' : 'cliente');
+        
+        if(rol === 'cliente') {
+            cargarCatalogo();
+            cargarMisPagos();
+        }
+    }
+
+    function renderMenu() {
+        const menu = document.getElementById('nav-menu');
+        if (currentUser.rol === 'admin') {
+            menu.innerHTML = `
+                <li class="nav-item"><a class="nav-link" href="#" onclick="showSection('admin')">Panel Control</a></li>
+                <li class="nav-item"><a class="nav-link text-warning" href="#" onclick="logout()">Cerrar Sesión</a></li>
+            `;
+        } else {
+            menu.innerHTML = `
+                <li class="nav-item"><a class="nav-link" href="#" onclick="showSection('cliente')">Mi Tienda</a></li>
+                <li class="nav-item"><a class="nav-link text-warning" href="#" onclick="logout()">Cerrar Sesión</a></li>
+            `;
+        }
+    }
+
+    function logout() {
+        currentUser = null;
+        document.getElementById('nav-menu').innerHTML = '';
+        showSection('login');
+    }
+
+    // --- CONEXIÓN AL BACKEND ---
+
+    // Cargar Reportes (Vistas del Admin)
+    async function cargarReporte(endpoint) {
+        try {
+            const res = await fetch(`${API_BASE}/${endpoint}`);
+            const data = await res.json();
+            renderTabla(data);
+        } catch (err) { alert("Error al cargar datos"); }
+    }
+
+    function renderTabla(data) {
+        const head = document.getElementById('tabla-head');
+        const body = document.getElementById('tabla-body');
+        head.innerHTML = ""; body.innerHTML = "";
+
+        if(data.length === 0) return body.innerHTML = "<tr><td>No hay datos</td></tr>";
+
+        // Cabeceras dinámicas basadas en las llaves del JSON
+        let cols = Object.keys(data[0]);
+        let rowHead = "<tr>";
+        cols.forEach(c => rowHead += `<th>${c.toUpperCase()}</th>`);
+        head.innerHTML = rowHead + "</tr>";
+
+        // Filas
+        data.forEach(item => {
+            let row = "<tr>";
+            cols.forEach(c => row += `<td>${item[c]}</td>`);
+            body.innerHTML += row + "</tr>";
+        });
+    }
+
+    // Cargar Catálogo (Vistas del Cliente)
+    async function cargarCatalogo() {
+    try {
+        const res = await fetch(`${API_BASE}/juegos/todo`);
+        const data = await res.json();
+        const container = document.getElementById('catalogo-container');
+        container.innerHTML = "";
+
+        data.forEach(juego => {
+            const nombre = juego.nombre_juego || "Sin nombre";
+            const tipo = juego.tipo_dejuego || "Juego";
+            // Usamos el nombre como identificador simple para este ejemplo
+            const juegoId = juego.nombre_juego; 
+
+            container.innerHTML += `
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h6 class="fw-bold">${nombre}</h6>
+                            <p class="small text-muted mb-2">Tipo: ${tipo}</p>
+                            <button class="btn btn-sm btn-success w-100" onclick="iniciarCompra('${nombre}')">
+                                🛒 Comprar Ahora
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    } catch (err) {
+        console.error("Error:", err);
+    }
+} 
+
+async function cargarMisPagos() {
+    try {
+        const res = await fetch(`${API_BASE}/clientes/${currentUser.id}/pagos`);
+        const data = await res.json();
+        const lista = document.getElementById('lista-pagos');
+        lista.innerHTML = data.length ? "" : "No tienes métodos registrados.";
+        
+        data.forEach(p => {
+            // Buscamos cualquier campo que pueda ser la tarjeta o usamos "Desconocido"
+            const tarjeta = p.numero_tarjeta || p.tarjeta || p.Numero || "";
+            const terminacion = tarjeta ? `**** ${tarjeta.toString().slice(-4)}` : "Tarjeta vinculada";
+            const metodo = p.Metodo || p.metodo || "Pago";
+
+            lista.innerHTML += `
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>${terminacion}</span>
+                    <span class="badge bg-secondary">${metodo}</span>
+                </li>`;
+        });
+    } catch (err) {
+        console.error("Error en pagos:", err);
+    }
+}
+
+///COMPRAS
+    async function iniciarCompra(nombreJuego) {
+    // 1. Simulamos que se crea un pedido ID (en un sistema real esto vendría de la DB)
+    const pedidoSimuladoId = Math.floor(Math.random() * 1000) + 1;
+
+    // 2. Pedimos al usuario que elija su método de pago (ID del método)
+    const metodoId = prompt(`Vas a comprar: ${nombreJuego}\nIngresa el ID del método de pago que deseas usar (ej: 1 para Visa, 2 para PayPal):`);
+
+    if (!metodoId) return;
+
+    try {
+        // 3. Llamamos a tu procedimiento para asignar el pago al pedido
+        const response = await fetch(`${API_BASE}/pedidos/asignar-metodo-pago`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                metododepago: parseInt(metodoId),
+                pedidoid: pedidoSimuladoId
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert(`✅ ¡Compra exitosa!\nJuego: ${nombreJuego}\nPedido #${pedidoSimuladoId}\nEstado: ${result.message}`);
+        } else {
+            alert(`❌ Error: ${result.error}`);
+        }
+    } catch (err) {
+        alert("Error de conexión al procesar el pago.");
+    }
+}
+
+    // --- UTILIDADES ---
+    function showSection(id) {
+        document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+        document.getElementById(`sec-${id}`).classList.remove('hidden');
+    }
+
+</script>
+
+</body>
+</html>

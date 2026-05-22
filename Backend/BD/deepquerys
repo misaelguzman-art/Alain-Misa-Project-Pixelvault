@@ -1,0 +1,89 @@
+USE [BD2_tienda];
+GO
+
+-- =====================================================
+-- 1. SP para obtener ediciones de un juego (con manejo de ID 0)
+-- =====================================================
+CREATE OR ALTER PROCEDURE ObtenerEdicionesProducto
+    @productid INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF @productid IS NULL OR @productid = 0
+        RETURN;
+    SELECT 
+        ep.edicionproductid,
+        e.name AS nombre_edicion,
+        ep.precio,
+        ep.fecha_lanzamiento,
+        ISNULL(inv.cantidad, 0) AS stock
+    FROM Product.EdicionProduct ep
+    INNER JOIN Product.Edicion e ON e.edicionid = ep.edicionid
+    LEFT JOIN Product.Inventario inv ON inv.edicionproductid = ep.edicionproductid
+    WHERE ep.productid = @productid
+    ORDER BY ep.precio ASC;
+END;
+GO
+
+-- =====================================================
+-- 2. SP para agregar item al carrito
+-- =====================================================
+CREATE OR ALTER PROCEDURE AgregarItemCarrito
+    @carro_id INT,
+    @productoid INT,
+    @cantidad_pedida INT,
+    @precio_prod DECIMAL(10,2)
+AS
+BEGIN
+    IF EXISTS (SELECT 1 FROM Venta.CarroDetalles WHERE carro_id = @carro_id AND productoid = @productoid)
+        UPDATE Venta.CarroDetalles SET cantidad_pedida = cantidad_pedida + @cantidad_pedida
+        WHERE carro_id = @carro_id AND productoid = @productoid;
+    ELSE
+        INSERT INTO Venta.CarroDetalles (carro_id, productoid, cantidad_pedida, precio_prod)
+        VALUES (@carro_id, @productoid, @cantidad_pedida, @precio_prod);
+END;
+GO
+
+-- =====================================================
+-- 3. SP para eliminar item del carrito
+-- =====================================================
+CREATE OR ALTER PROCEDURE EliminarItemCarrito
+    @detallesid INT,
+    @carro_id INT
+AS
+BEGIN
+    DELETE FROM Venta.CarroDetalles WHERE detallesid = @detallesid AND carro_id = @carro_id;
+END;
+GO
+
+-- =====================================================
+-- 4. Corregir SP ObtenerCarritoActivo para que incluya detallesid
+-- =====================================================
+CREATE OR ALTER PROCEDURE ObtenerCarritoActivo @clienteid INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT TOP 1 
+        c.carro_id, c.estado, c.fecha_creacion,
+        cd.detallesid,   -- esta columna es esencial
+        cd.productoid, cd.cantidad_pedida, cd.precio_prod,
+        p.name AS nombre_producto, p.tipo_juego,
+        e.name AS nombre_edicion
+    FROM Venta.Carrito c
+    LEFT JOIN Venta.CarroDetalles cd ON cd.carro_id = c.carro_id
+    LEFT JOIN Product.Product p ON p.productid = cd.productoid
+    LEFT JOIN Product.EdicionProduct ep ON ep.edicionproductid = cd.productoid
+    LEFT JOIN Product.Edicion e ON e.edicionid = ep.edicionid
+    WHERE c.Id_cliente = @clienteid AND c.estado = 'activo'
+    ORDER BY c.fecha_creacion DESC;
+END;
+GO
+
+PRINT 'Procedimientos actualizados correctamente.';
+
+
+ 
+GO
+EXEC sp_helptext 'ObtenerEdicionesProducto';
+
+EXEC ObtenerEdicionesProducto @productid = 3;

@@ -1,0 +1,75 @@
+ USE [BD2_tienda];
+
+ USE [BD2_tienda];
+GO
+
+-- =====================================================
+-- 1. Eliminar posibles duplicados (deja solo el primero de cada código)
+-- =====================================================
+WITH Duplicados AS (
+    SELECT canjear_codigo, edicionproductid,
+           ROW_NUMBER() OVER (PARTITION BY canjear_codigo ORDER BY id_ejemplar) AS rn
+    FROM Product.Ejemplar
+)
+DELETE FROM Duplicados WHERE rn > 1;
+GO
+
+-- =====================================================
+-- 2. Agregar ejemplares faltantes (hasta 15 por edición)
+--    usando un formato único por edición
+-- =====================================================
+DECLARE @edicionproductid INT;
+DECLARE @nombre_juego VARCHAR(100);
+DECLARE @nombre_edicion VARCHAR(50);
+DECLARE @actual INT;
+DECLARE @necesarios INT;
+DECLARE @i INT;
+
+DECLARE cur CURSOR FOR
+    SELECT ep.edicionproductid, p.name, e.name
+    FROM Product.EdicionProduct ep
+    INNER JOIN Product.Product p ON ep.productid = p.productid
+    INNER JOIN Product.Edicion e ON ep.edicionid = e.edicionid
+    WHERE p.estado = 'activo' AND p.tipo_juego = 'juego';
+
+OPEN cur;
+FETCH NEXT FROM cur INTO @edicionproductid, @nombre_juego, @nombre_edicion;
+
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    -- Contar cuántos ejemplares activos hay actualmente
+    SELECT @actual = COUNT(*) FROM Product.Ejemplar 
+    WHERE edicionproductid = @edicionproductid AND estado = 'activo';
+    
+    SET @necesarios = 15 - @actual;
+    
+    IF @necesarios > 0
+    BEGIN
+        SET @i = @actual + 1;
+        WHILE @i <= 15
+        BEGIN
+            -- Código único: ED-<edicionproductid>-<número de 3 dígitos>
+            DECLARE @codigo VARCHAR(50) = 'ED-' + CAST(@edicionproductid AS VARCHAR) + '-' + RIGHT('000' + CAST(@i AS VARCHAR), 3);
+            
+            -- Verificar que no exista ya (por si acaso)
+            IF NOT EXISTS (SELECT 1 FROM Product.Ejemplar WHERE canjear_codigo = @codigo)
+            BEGIN
+                INSERT INTO Product.Ejemplar (productid, edicionproductid, canjear_codigo, estado)
+                VALUES (NULL, @edicionproductid, @codigo, 'activo');
+            END
+            SET @i = @i + 1;
+        END
+        PRINT 'Edición ' + @nombre_juego + ' (' + @nombre_edicion + '): tenía ' + CAST(@actual AS VARCHAR) + 
+              ' códigos, se agregaron ' + CAST(@necesarios AS VARCHAR) + ' (total ahora 15).';
+    END
+    ELSE
+    BEGIN
+        PRINT 'Edición ' + @nombre_juego + ' (' + @nombre_edicion + '): ya tiene 15 o más códigos.';
+    END
+    
+    FETCH NEXT FROM cur INTO @edicionproductid, @nombre_juego, @nombre_edicion;
+END
+
+CLOSE cur;
+DEALLOCATE cur;
+GO

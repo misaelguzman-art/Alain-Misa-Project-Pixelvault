@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixelVault - Tienda Gamer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ========== SISTEMA DE DISEÑO COMPACTO ========== */
+        :root {
+            --bg: #0a0a0f; --surface: #13131a; --surface2: #1c1c27;
+            --borde: #2a2a3d; --acento: #7c3aed; --acento2: #a855f7;
+            --verde: #10b981; --rojo: #ef4444; --amarillo: #f59e0b;
+            --texto: #e2e8f0; --texto-sec: #94a3b8; --blanco: #fff;
+            --radio: 8px; --radio-g: 12px; --transicion: all 0.2s ease;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg); color: var(--texto); font-family: 'DM Sans', sans-serif; }
+        
+        /* Utilidades */
+        .hidden { display: none !important; }
+        .flex { display: flex; }
+        .gap-1 { gap: 0.5rem; }
+        .gap-2 { gap: 1rem; }
+        .between { justify-content: space-between; }
+        .center { align-items: center; }
+        .col { flex-direction: column; }
+        .w-full { width: 100%; }
+        .mb-1 { margin-bottom: 0.5rem; }
+        .mb-2 { margin-bottom: 1rem; }
+        .mt-2 { margin-top: 1rem; }
+        .p-1 { padding: 0.5rem; }
+        .p-2 { padding: 1rem; }
+        .text-center { text-align: center; }
+        
+        /* Componentes base */
+        .navbar {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(10,10,15,0.9); backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--borde);
+            padding: 0 2rem; height: 64px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .nav-brand {
+            font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 2px;
+            background: linear-gradient(135deg, var(--blanco), var(--acento2));
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+            cursor: pointer;
+        }
+        .nav-btn {
+            background: none; border: none; color: var(--texto-sec);
+            font-size: 0.875rem; font-weight: 500; padding: 0.5rem 1rem;
+            border-radius: var(--radio); cursor: pointer; transition: var(--transicion);
+        }
+        .nav-btn:hover { color: var(--blanco); background: var(--surface2); }
+        .nav-btn.danger:hover { background: var(--rojo); color: white; }
+        
+        .contenedor { max-width: 1280px; margin: 0 auto; padding: 2rem; }
+        
+        /* Login */
+        .login-section {
+            min-height: calc(100vh - 64px);
+            display: flex; align-items: center; justify-content: center;
+            background: radial-gradient(circle at 10% 20%, rgba(124,58,237,0.1) 0%, transparent 50%);
+        }
+        .login-card {
+            background: var(--surface); border: 1px solid var(--borde);
+            border-radius: 16px; padding: 2.5rem; width: 100%; max-width: 400px;
+        }
+        .login-card h2 {
+            font-size: 2.5rem; margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--blanco), var(--acento2));
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+        
+        /* Formularios */
+        .input, .select {
+            width: 100%; background: var(--surface2); border: 1px solid var(--borde);
+            border-radius: var(--radio); color: var(--texto); padding: 0.75rem 1rem;
+            font-family: inherit; font-size: 0.9rem; outline: none;
+            transition: var(--transicion);
+        }
+        .input:focus, .select:focus { border-color: var(--acento); box-shadow: 0 0 0 2px rgba(124,58,237,0.2); }
+        .label {
+            display: block; font-size: 0.75rem; color: var(--texto-sec);
+            margin-bottom: 0.5rem; font-weight: 600; text-transform: uppercase;
+        }
+        
+        /* Botones unificados */
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            gap: 0.5rem; padding: 0.7rem 1.5rem; border-radius: var(--radio);
+            font-weight: 600; font-size: 0.875rem; cursor: pointer;
+            border: none; transition: var(--transicion);
+        }
+        .btn-primario { background: linear-gradient(135deg, var(--acento), var(--acento2)); color: white; }
+        .btn-secundario { background: var(--surface2); color: var(--texto); border: 1px solid var(--borde); }
+        .btn-exito { background: linear-gradient(135deg, var(--verde), #059669); color: white; }
+        .btn-peligro { background: transparent; color: var(--rojo); border: 1px solid var(--rojo); }
+        .btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-full { width: 100%; }
+        
+        /* Layout cliente */
+        .cliente-grid { display: grid; grid-template-columns: 1fr 360px; gap: 2rem; }
+        @media (max-width: 768px) { .cliente-grid { grid-template-columns: 1fr; } }
+        
+        /* Pestañas */
+        .tabs {
+            display: flex; gap: 0.25rem; margin-bottom: 1.5rem;
+            background: var(--surface); border-radius: var(--radio); padding: 0.25rem;
+        }
+        .tab {
+            flex: 1; padding: 0.625rem; border-radius: 6px; border: none;
+            background: none; color: var(--texto-sec); font-weight: 600;
+            font-size: 0.875rem; cursor: pointer; transition: var(--transicion);
+        }
+        .tab.active { background: var(--surface2); color: var(--blanco); }
+        
+        /* Tarjetas de juegos */
+        .grid-catalogo {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 1.25rem;
+        }
+        .card {
+            background: var(--surface); border: 1px solid var(--borde);
+            border-radius: var(--radio-g); overflow: hidden;
+            transition: var(--transicion); cursor: pointer;
+        }
+        .card:hover { border-color: var(--acento); transform: translateY(-4px); }
+        .card-header { height: 100px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; }
+        .card-body { padding: 1rem; }
+        .card-body h5 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .card-footer { padding: 0 1rem 1rem; }
+        
+        .tag {
+            display: inline-block; font-size: 0.65rem; padding: 0.2rem 0.5rem;
+            border-radius: 4px; font-weight: 700; text-transform: uppercase;
+        }
+        .tag-juego { background: rgba(124,58,237,0.2); color: var(--acento2); }
+        .tag-dlc { background: rgba(245,158,11,0.15); color: var(--amarillo); }
+        .tag-comp { background: rgba(16,185,129,0.15); color: var(--verde); }
+        
+        /* Selector de ediciones */
+        .edition-picker {
+            background: var(--surface2); border: 1px solid var(--borde);
+            border-radius: var(--radio); padding: 0.75rem; margin-top: 0.75rem;
+            display: none;
+        }
+        .edition-picker.open { display: block; animation: fadeIn 0.2s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .edition-opt {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer;
+            border: 1px solid transparent; margin-bottom: 0.35rem;
+            transition: var(--transicion);
+        }
+        .edition-opt:hover { border-color: var(--acento); background: rgba(124,58,237,0.08); }
+        .edition-opt.no-stock { opacity: 0.4; cursor: not-allowed; }
+        .edition-opt.no-stock:hover { border-color: transparent; background: transparent; }
+        .ed-name { font-size: 0.85rem; font-weight: 500; }
+        .ed-price { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: var(--acento2); }
+        .ed-stock { font-size: 0.7rem; color: var(--texto-sec); }
+        
+        /* Paneles laterales */
+        .sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
+        .panel {
+            background: var(--surface); border: 1px solid var(--borde);
+            border-radius: var(--radio-g); overflow: hidden;
+        }
+        .panel-header {
+            padding: 1rem 1.25rem; border-bottom: 1px solid var(--borde);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .panel-header h4 { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; }
+        .panel-body { padding: 1rem 1.25rem; }
+        
+        .badge {
+            background: var(--amarillo); color: #000; font-size: 0.7rem;
+            font-weight: 700; border-radius: 999px; padding: 2px 8px;
+            min-width: 20px; text-align: center;
+        }
+        
+        /* Carrito */
+        .cart-empty { text-align: center; padding: 2rem 1rem; color: var(--texto-sec); }
+        .cart-item {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            padding: 0.75rem 0; border-bottom: 1px solid var(--borde); gap: 0.5rem;
+        }
+        .cart-item:last-child { border-bottom: none; }
+        .cart-name { font-size: 0.85rem; font-weight: 500; flex: 1; }
+        .cart-edition { font-size: 0.7rem; color: var(--texto-sec); margin-top: 2px; }
+        .cart-price { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: var(--acento2); }
+        .cart-remove { background: none; border: none; color: var(--texto-sec); cursor: pointer; }
+        .cart-remove:hover { color: var(--rojo); }
+        .cart-total {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.75rem 0 0; font-weight: 600;
+        }
+        .total-amount { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; color: var(--blanco); }
+        
+        /* Métodos de pago */
+        .pago-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.6rem 0; border-bottom: 1px solid var(--borde);
+        }
+        .pago-item:last-child { border-bottom: none; }
+        .pago-number { font-size: 0.85rem; font-family: monospace; }
+        .pago-method { font-size: 0.7rem; color: var(--texto-sec); }
+        .pago-badge {
+            font-size: 0.7rem; padding: 2px 8px; border-radius: 4px;
+            background: rgba(124,58,237,0.2); color: var(--acento2); font-weight: 600;
+        }
+        
+        /* Modal */
+        .modal-overlay {
+            position: fixed; inset: 0; z-index: 200;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(4px);
+            display: flex; align-items: center; justify-content: center; padding: 1rem;
+        }
+        .modal {
+            background: var(--surface); border: 1px solid var(--borde);
+            border-radius: 16px; padding: 2rem; width: 100%; max-width: 460px;
+            animation: slideUp 0.2s ease;
+        }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .modal h3 { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; margin-bottom: 1.5rem; }
+        .divider { border: none; border-top: 1px solid var(--borde); margin: 1rem 0; }
+        .order-row { display: flex; justify-content: space-between; font-size: 0.875rem; padding: 0.3rem 0; }
+        .order-row.total { font-weight: 700; font-size: 1rem; color: var(--blanco); }
+        .promo-tag { color: var(--verde); }
+        
+        /* Éxito */
+        .success-screen { text-align: center; padding: 1rem; }
+        .success-icon { font-size: 3.5rem; margin-bottom: 1rem; }
+        .success-screen h3 { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: var(--verde); }
+        .order-number { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; color: var(--acento2); margin: 0.75rem 0; }
+        
+        /* Historial */
+        .historial-item {
+            background: var(--surface); border: 1px solid var(--borde);
+            border-radius: var(--radio-g); padding: 1rem 1.25rem;
+            margin-bottom: 0.75rem; display: flex; justify-content: space-between;
+        }
+        .historial-id { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: var(--acento2); }
+        .historial-date { font-size: 0.75rem; color: var(--texto-sec); margin-top: 2px; }
+        .historial-total { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; }
+        .estado-badge {
+            font-size: 0.7rem; font-weight: 600; padding: 3px 8px;
+            border-radius: 4px; text-transform: uppercase;
+        }
+        .estado-entregado { background: rgba(16,185,129,0.15); color: var(--verde); }
+        .estado-pendiente { background: rgba(245,158,11,0.15); color: var(--amarillo); }
+        
+        /* Admin */
+        .admin-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .report-card { cursor: pointer; padding: 1.25rem; text-align: center; }
+        .report-card .icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+        .report-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .report-table th, .report-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--borde); text-align: left; }
+        .report-table th { color: var(--texto-sec); font-size: 0.7rem; text-transform: uppercase; }
+        
+        /* Loader y toast */
+        .spinner {
+            width: 20px; height: 20px; border: 2px solid var(--borde);
+            border-top-color: var(--acento2); border-radius: 50%;
+            animation: spin 0.6s linear infinite; display: inline-block;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        #toast {
+            position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 300;
+            background: var(--surface2); border: 1px solid var(--borde);
+            border-radius: var(--radio-g); padding: 0.75rem 1.25rem;
+            font-size: 0.875rem; transform: translateY(100px);
+            transition: transform 0.25s; max-width: 320px;
+        }
+        #toast.show { transform: translateY(0); }
+        #toast.success { border-color: var(--verde); }
+        #toast.error { border-color: var(--rojo); }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="nav-brand" onclick="if(usuarioActual) mostrarSeccion(usuarioActual.rol === 'admin' ? 'admin' : 'cliente')">PIXEL<span>VAULT</span></div>
+        <div class="flex gap-1" id="nav-links"></div>
+    </nav>
+    <div id="toast"></div>
+
+    <!-- Login -->
+    <section id="sec-login" class="login-section">
+        <div class="login-card">
+            <h2 class="text-center">Iniciar Sesión</h2>
+            <p class="text-center mb-2">Ingresa tu ID de cliente para continuar</p>
+            <div class="mb-1"><label class="label">ID de Cliente</label><input type="number" id="login-id" class="input" placeholder="Ej: 1"></div>
+            <div class="mb-2"><label class="label">Rol</label><select id="login-rol" class="select"><option value="cliente">Cliente</option><option value="admin">Administrador</option></select></div>
+            <button class="btn btn-primario btn-full" onclick="iniciarSesion()">Entrar →</button>
+        </div>
+    </section>
+
+    <!-- Cliente -->
+    <section id="sec-cliente" class="hidden">
+        <div class="contenedor cliente-grid">
+            <div>
+                <div class="tabs">
+                    <button class="tab active" onclick="cambiarPestana('catalogo', this)">🎮 Catálogo</button>
+                    <button class="tab" onclick="cambiarPestana('historial', this)">📦 Mis Pedidos</button>
+                </div>
+                <div id="tab-catalogo"><div class="encabezado-seccion mb-2"><h3>Catálogo</h3><p>Selecciona un juego para ver sus ediciones</p></div><div id="catalogo-container" class="grid-catalogo"></div></div>
+                <div id="tab-historial" class="hidden"><div class="encabezado-seccion mb-2"><h3>Mis Pedidos</h3><p>Historial de compras entregadas</p></div><div id="historial-container"></div></div>
+            </div>
+            <div class="sidebar">
+                <div class="panel">
+                    <div class="panel-header"><h4>🛒 Carrito</h4><span id="cart-count" class="badge" style="display:none">0</span></div>
+                    <div class="panel-body"><div id="cart-list"></div><div id="cart-footer" class="hidden"><div class="divider"></div><div><label class="label">Promoción</label><select id="promo-select" class="select w-full"></select></div><div class="cart-total"><span>Total</span><span class="total-amount" id="cart-total">$0.00</span></div><button class="btn btn-exito btn-full mt-2" onclick="abrirCheckout()">Confirmar Compra →</button></div></div>
+                </div>
+                <div class="panel">
+                    <div class="panel-header"><h4>💳 Mis Tarjetas</h4></div>
+                    <div class="panel-body"><div id="pagos-list"></div></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Admin -->
+   <!-- Reemplaza la sección de admin en tu HTML con esta versión mejorada -->
+
+<section id="sec-admin" class="hidden">
+    <div class="contenedor">
+        <!-- Fila 1: Reportes existentes -->
+        <div class="admin-grid">
+            <div class="panel report-card" onclick="cargarReporte('juegos/stock-bajo')">
+                <div class="icon">⚠️</div>
+                <div class="fw-600">Stock Bajo</div>
+                <div class="texto-sec">Menos de 10 unidades</div>
+            </div>
+            <div class="panel report-card" onclick="cargarReporte('reportes/ingresos-pedidos')">
+                <div class="icon">💰</div>
+                <div class="fw-600">Ingresos por Pedido</div>
+                <div class="texto-sec">Reporte de ventas por pedido</div>
+            </div>
+            <div class="panel report-card" onclick="cargarReporte('reportes/directorio-clientes')">
+                <div class="icon">👥</div>
+                <div class="fw-600">Directorio Clientes</div>
+                <div class="texto-sec">Listado completo de clientes</div>
+            </div>
+        </div>
+        
+        <!-- Fila 2: Nuevos reportes implementados -->
+        <div class="admin-grid">
+            <div class="panel report-card" onclick="cargarReporte('reportes/ventas-por-juego')">
+                <div class="icon">🎮</div>
+                <div class="fw-600">Ingresos por Juego/DLC</div>
+                <div class="texto-sec">Total generado por cada producto</div>
+            </div>
+            <div class="panel report-card" onclick="cargarReporte('reportes/catalogo-jerarquia')">
+                <div class="icon">📋</div>
+                <div class="fw-600">Catálogo Jerárquico</div>
+                <div class="texto-sec">Juegos, ediciones y DLCs</div>
+            </div>
+            <div class="panel report-card" onclick="cargarReporte('reportes/productos-abandonados')">
+                <div class="icon">🛒❌</div>
+                <div class="fw-600">Productos Abandonados</div>
+                <div class="texto-sec">Más retirados del carrito</div>
+            </div>
+        </div>
+
+        <!-- Fila 3: Reportes adicionales (requieren input) -->
+        <div class="admin-grid">
+            <div class="panel report-card" onclick="mostrarSelectorProducto()">
+                <div class="icon">📜</div>
+                <div class="fw-600">Historial de Producto</div>
+                <div class="texto-sec">Movimientos por ID</div>
+            </div>
+            <div class="panel report-card" onclick="cargarReporte('reportes/vista-stock-bajo')">
+                <div class="icon">📊</div>
+                <div class="fw-600">Vista Stock Bajo</div>
+                <div class="texto-sec">Versión directa sin SP</div>
+            </div>
+            <div class="panel report-card" onclick="cargarReporte('reportes/alertas-inventario')">
+                <div class="icon">🚨</div>
+                <div class="fw-600">Alertas Inventario</div>
+                <div class="texto-sec">Alertas de stock crítico</div>
+            </div>
+        </div>
+
+        <!-- Panel de resultados -->
+        <div class="panel mt-2">
+            <div class="panel-header">
+                <h4>Resultados</h4>
+                <button class="btn btn-secundario" onclick="limpiarTabla()" style="padding:0.25rem 0.75rem">Limpiar</button>
+            </div>
+            <div class="panel-body" style="overflow-x:auto">
+                <table class="report-table" id="report-table">
+                    <thead id="report-head"></thead>
+                    <tbody id="report-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Modal para seleccionar ID de producto (historial) -->
+    <div class="modal-overlay hidden" id="modal-producto">
+        <div class="modal" style="max-width: 400px;">
+            <h3>Historial de Producto</h3>
+            <div class="mb-2">
+                <label class="label">ID del Producto</label>
+                <input type="number" id="producto-id" class="input w-full" placeholder="Ej: 1">
+            </div>
+            <div class="flex gap-1">
+                <button class="btn btn-secundario flex-1" onclick="cerrarModalProducto()">Cancelar</button>
+                <button class="btn btn-primario flex-1" onclick="cargarHistorialProducto()">Buscar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay hidden" id="checkout-overlay"><div class="modal" id="checkout-modal"></div></div>
+
+    <script>
+        // ========== CONFIGURACIÓN ==========
+        const API = 'http://localhost:3000/api';
+        let usuarioActual = null, carritoActual = null, promociones = [], pagos = [];
+        const EMOJIS = { juego: '🎮', dlc: '🔮', complemento: '🎁' };
+        
+        // Utilidades
+        const toast = (msg, tipo = 'success') => {
+            const el = document.getElementById('toast');
+            el.textContent = msg;
+            el.className = `show ${tipo}`;
+            setTimeout(() => el.className = '', 2500);
+        };
+        
+        const mostrarSeccion = (id) => {
+            document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+            document.getElementById(`sec-${id}`)?.classList.remove('hidden');
+        };
+        
+        // Navegación
+        const actualizarNav = () => {
+            const links = document.getElementById('nav-links');
+            links.innerHTML = usuarioActual.rol === 'admin' 
+                ? '<button class="nav-btn danger" onclick="cerrarSesion()">Cerrar sesión</button>'
+                : `<button class="nav-btn" onclick="cambiarPestana('catalogo', this)">Catálogo</button>
+                   <button class="nav-btn" onclick="cambiarPestana('historial', this); cargarHistorial()">Mis Pedidos</button>
+                   <button class="nav-btn danger" onclick="cerrarSesion()">Salir</button>`;
+        };
+        
+        // Login
+        async function iniciarSesion() {
+            const id = document.getElementById('login-id').value;
+            const rol = document.getElementById('login-rol').value;
+            if (!id) return toast('Ingresa un ID', 'error');
+            usuarioActual = { id: parseInt(id), rol };
+            actualizarNav();
+            if (rol === 'admin') mostrarSeccion('admin');
+            else {
+                mostrarSeccion('cliente');
+                await Promise.all([cargarCatalogo(), cargarPagos(), cargarCarrito(), cargarPromociones()]);
+            }
+        }
+        
+        function cerrarSesion() { usuarioActual = null; carritoActual = null; document.getElementById('nav-links').innerHTML = ''; mostrarSeccion('login'); }
+        
+        // Pestañas
+        function cambiarPestana(pestana, btn) {
+            document.getElementById('tab-catalogo').classList.toggle('hidden', pestana !== 'catalogo');
+            document.getElementById('tab-historial').classList.toggle('hidden', pestana !== 'historial');
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            if (pestana === 'historial') cargarHistorial();
+        }
+        
+        // Renderizado genérico de tarjetas
+        const generarCard = (juego, idx) => {
+            const tipo = juego.tipo_dejuego || 'juego';
+            const emoji = EMOJIS[tipo] || '🎮';
+            const tagClass = tipo === 'juego' ? 'tag-juego' : (tipo === 'dlc' ? 'tag-dlc' : 'tag-comp');
+            return `
+                <div class="card" id="card-${idx}">
+                    <div class="card-header" style="background:linear-gradient(135deg,${['#3b1f8c','#1a3a5c','#1a4a2e','#4a1a1a'][idx%4]},${['#3b1f8c','#1a3a5c','#1a4a2e','#4a1a1a'][idx%4]}88)">
+                        <span style="font-size:2.5rem">${emoji}</span>
+                    </div>
+                    <div class="card-body">
+                        <h5>${juego.nombre_juego}</h5>
+                        <span class="tag ${tagClass}">${tipo}</span>
+                        ${juego.Cabeza ? `<div class="ed-stock mt-1">de ${juego.Cabeza}</div>` : ''}
+                    </div>
+                    <div class="card-footer">
+                        <div class="ed-price">Ver ediciones →</div>
+                        <button class="btn btn-primario w-full mt-1" onclick="toggleEdiciones(event, ${idx}, ${juego.productid}, '${juego.nombre_juego.replace(/'/g,"\\'")}', '${tipo}')">+ Agregar</button>
+                        <div class="edition-picker" id="picker-${idx}"><h6 class="label">Elige edición</h6><div id="editions-${idx}"><div class="spinner"></div></div></div>
+                    </div>
+                </div>
+            `;
+        };
+        
+        async function cargarCatalogo() {
+            const container = document.getElementById('catalogo-container');
+            container.innerHTML = '<div class="text-center">Cargando...</div>';
+            try {
+                const res = await fetch(`${API}/juegos/todo`);
+                const data = await res.json();
+                container.innerHTML = data.map((j, i) => generarCard(j, i)).join('');
+            } catch { container.innerHTML = '<div class="text-center" style="color:var(--rojo)">Error</div>'; }
+        }
+        
+        async function toggleEdiciones(e, idx, productId, nombre, tipo) {
+            e.stopPropagation();
+            const picker = document.getElementById(`picker-${idx}`);
+            const editionsDiv = document.getElementById(`editions-${idx}`);
+            if (picker.classList.contains('open')) return picker.classList.remove('open');
+            document.querySelectorAll('.edition-picker').forEach(p => p.classList.remove('open'));
+            picker.classList.add('open');
+            if (editionsDiv.dataset.loaded) return;
+            
+            try {
+                if (tipo !== 'juego') {
+                    editionsDiv.innerHTML = `<div class="edition-opt" onclick="agregarCarrito(${productId}, '${nombre}', 'Estándar', 0)"><div><div class="ed-name">Contenido Digital</div><div class="ed-stock">Disponible</div></div></div>`;
+                } else {
+                    const res = await fetch(`${API}/productos/${productId}/ediciones`);
+                    const eds = await res.json();
+                    editionsDiv.innerHTML = eds.map(ed => `
+                        <div class="edition-opt ${ed.stock === 0 ? 'no-stock' : ''}" 
+                             onclick="${ed.stock === 0 ? '' : `agregarCarrito(${productId}, '${nombre.replace(/'/g,"\\'")}', '${ed.nombre_edicion}', ${ed.precio})`}">
+                            <div><div class="ed-name">${ed.nombre_edicion}</div><div class="ed-stock">${ed.stock === 0 ? 'Sin stock' : `Stock: ${ed.stock}`}</div></div>
+                            <div class="ed-price">$${parseFloat(ed.precio).toFixed(2)}</div>
+                        </div>
+                    `).join('');
+                }
+                editionsDiv.dataset.loaded = '1';
+            } catch { editionsDiv.innerHTML = '<div class="text-center" style="color:var(--rojo)">Error</div>'; }
+        }
+        
+        // Carrito
+        async function cargarCarrito() {
+            try {
+                const res = await fetch(`${API}/clientes/${usuarioActual.id}/carrito`);
+                const data = await res.json();
+                if (data.carrito) carritoActual = { carro_id: data.carrito.carro_id, items: data.items };
+                else {
+                    const nuevo = await fetch(`${API}/clientes/${usuarioActual.id}/carrito`, { method: 'POST' }).then(r => r.json());
+                    carritoActual = { carro_id: nuevo.carro_id, items: [] };
+                }
+                renderCarrito();
+            } catch { toast('Error carrito', 'error'); }
+        }
+        
+        async function agregarCarrito(productId, nombre, edicion, precio) {
+            if (!carritoActual) return toast('Error: carrito no activo', 'error');
+            try {
+                await fetch(`${API}/carrito/${carritoActual.carro_id}/items`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ productoid: productId, cantidad_pedida: 1, precio_prod: precio })
+                });
+                const existente = carritoActual.items.find(i => i.productoid === productId);
+                if (existente) existente.cantidad_pedida++;
+                else carritoActual.items.push({ productoid: productId, nombre_producto: nombre, nombre_edicion: edicion, precio_prod: precio, cantidad_pedida: 1 });
+                renderCarrito();
+                toast(`✅ ${nombre} agregado`);
+                document.querySelectorAll('.edition-picker').forEach(p => p.classList.remove('open'));
+            } catch { toast('Error al agregar', 'error'); }
+        }
+        
+        async function eliminarItem(detallesId, productId) {
+            try {
+                await fetch(`${API}/carrito/${carritoActual.carro_id}/items/${detallesId}`, { method: 'DELETE' });
+                carritoActual.items = carritoActual.items.filter(i => i.detallesid !== detallesId && i.productoid !== productId);
+                renderCarrito();
+                toast('Item eliminado');
+            } catch { toast('Error al eliminar', 'error'); }
+        }
+        
+        function renderCarrito() {
+            const list = document.getElementById('cart-list');
+            const footer = document.getElementById('cart-footer');
+            const badge = document.getElementById('cart-count');
+            if (!carritoActual?.items?.length) {
+                list.innerHTML = '<div class="cart-empty">Tu carrito está vacío<br><span style="font-size:1.5rem">🛒</span></div>';
+                footer.classList.add('hidden');
+                badge.style.display = 'none';
+                return;
+            }
+            const total = carritoActual.items.reduce((s, i) => s + i.precio_prod * i.cantidad_pedida, 0);
+            list.innerHTML = carritoActual.items.map(i => `
+                <div class="cart-item">
+                    <div style="flex:1"><div class="cart-name">${i.nombre_producto}</div>${i.nombre_edicion ? `<div class="cart-edition">${i.nombre_edicion}</div>` : ''}<div class="cart-edition">x${i.cantidad_pedida}</div></div>
+                    <div class="flex gap-1 center"><div class="cart-price">$${(i.precio_prod * i.cantidad_pedida).toFixed(2)}</div><button class="cart-remove" onclick="eliminarItem(${i.detallesid || null}, ${i.productoid})">✕</button></div>
+                </div>
+            `).join('');
+            document.getElementById('cart-total').textContent = `$${total.toFixed(2)}`;
+            footer.classList.remove('hidden');
+            badge.style.display = 'inline';
+            badge.textContent = carritoActual.items.reduce((s, i) => s + i.cantidad_pedida, 0);
+        }
+        
+        // Promociones
+        async function cargarPromociones() {
+            try {
+                const res = await fetch(`${API}/promociones/vigentes`);
+                promociones = await res.json();
+                const select = document.getElementById('promo-select');
+                select.innerHTML = '<option value="">Sin promoción</option>' + promociones.map(p => `<option value="${p.promocionid}">${p.nombre} (-${p.descuento}%)</option>`).join('');
+            } catch {}
+        }
+        
+        // Pagos
+        async function cargarPagos() {
+            try {
+                const res = await fetch(`${API}/clientes/${usuarioActual.id}/pagos`);
+                pagos = await res.json();
+                const container = document.getElementById('pagos-list');
+                if (!pagos.length) container.innerHTML = '<div class="text-center" style="color:var(--texto-sec)">Sin métodos registrados</div>';
+                else container.innerHTML = pagos.map((p, i) => `<div class="pago-item"><div><div class="pago-number">•••• •••• •••• ${String(i+1).padStart(4,'0')}</div><div class="pago-method">${p.MetodoPago || 'Pago'}</div></div><span class="pago-badge">#${i+1}</span></div>`).join('');
+            } catch {}
+        }
+        
+        // Checkout
+        function abrirCheckout() {
+            if (!carritoActual?.items?.length) return;
+            const total = carritoActual.items.reduce((s, i) => s + i.precio_prod * i.cantidad_pedida, 0);
+            const promoId = document.getElementById('promo-select').value;
+            const promo = promociones.find(p => p.promocionid == promoId);
+            const totalDesc = promo ? total * (1 - promo.descuento / 100) : total;
+            const metodoOptions = pagos.map((p, i) => `<option value="${p.id_metodo || i+1}">${p.MetodoPago || 'Método'} #${i+1}</option>`).join('');
+            
+            const modal = document.getElementById('checkout-modal');
+            modal.innerHTML = `
+                <h3>Confirmar Pedido</h3>
+                ${carritoActual.items.map(i => `<div class="order-row"><span>${i.nombre_producto} ${i.nombre_edicion ? `(${i.nombre_edicion})` : ''}</span><span>$${(i.precio_prod * i.cantidad_pedida).toFixed(2)}</span></div>`).join('')}
+                <div class="divider"></div>
+                ${promo ? `<div class="order-row"><span class="promo-tag">🏷 ${promo.nombre} (-${promo.descuento}%)</span><span class="promo-tag">-$${(total - totalDesc).toFixed(2)}</span></div>` : ''}
+                <div class="order-row total"><span>Total a pagar</span><span>$${totalDesc.toFixed(2)}</span></div>
+                <div class="divider"></div>
+                <div class="mb-2"><label class="label">Método de pago</label><select id="checkout-metodo" class="select w-full">${metodoOptions}</select></div>
+                <div class="flex gap-1"><button class="btn btn-secundario flex-1" onclick="cerrarCheckout()">Cancelar</button><button class="btn btn-exito flex-2" onclick="confirmarCompra(${promoId || 'null'})">Pagar $${totalDesc.toFixed(2)} →</button></div>
+            `;
+            document.getElementById('checkout-overlay').classList.remove('hidden');
+        }
+        
+        function cerrarCheckout() { document.getElementById('checkout-overlay').classList.add('hidden'); }
+        
+        async function confirmarCompra(promoId) {
+            const metodoId = parseInt(document.getElementById('checkout-metodo').value);
+            if (!metodoId) return toast('Selecciona método de pago', 'error');
+            const btn = document.querySelector('#checkout-modal .btn-exito');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>';
+            try {
+                const res = await fetch(`${API}/carrito/${carritoActual.carro_id}/confirmar`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ metodo_pago_id: metodoId })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+                if (promoId) await fetch(`${API}/pedidos/aplicar-promocion`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pedido_id: data.pedido_id, promocion_id: promoId }) });
+                
+                document.getElementById('checkout-modal').innerHTML = `
+                    <div class="success-screen"><div class="success-icon">✅</div><h3>¡Compra Exitosa!</h3><div class="order-number">Pedido #${data.pedido_id}</div><p>Tu pedido está siendo procesado.</p><p>Total cobrado: <strong>$${parseFloat(data.total).toFixed(2)}</strong></p><button class="btn btn-primario btn-full mt-2" onclick="reiniciarCarrito()">Seguir comprando</button></div>
+                `;
+                carritoActual.items = [];
+                renderCarrito();
+            } catch (err) { toast(`Error: ${err.message}`, 'error'); btn.disabled = false; btn.textContent = 'Reintentar'; }
+        }
+        
+        async function reiniciarCarrito() {
+            cerrarCheckout();
+            try {
+                const res = await fetch(`${API}/clientes/${usuarioActual.id}/carrito`, { method: 'POST' });
+                const data = await res.json();
+                carritoActual = { carro_id: data.carro_id, items: [] };
+                renderCarrito();
+                await cargarPagos();
+            } catch {}
+        }
+        
+        // Historial
+        async function cargarHistorial() {
+            const container = document.getElementById('historial-container');
+            container.innerHTML = '<div class="text-center">Cargando...</div>';
+            try {
+                const res = await fetch(`${API}/clientes/${usuarioActual.id}/pedidos-entregados`);
+                const data = await res.json();
+                if (!data.length) container.innerHTML = '<div class="text-center" style="color:var(--texto-sec);padding:2rem">No tienes pedidos entregados aún</div>';
+                else container.innerHTML = data.map(p => `
+                    <div class="historial-item"><div><div class="historial-id">Pedido #${p.pedido_id}</div><div class="historial-date">📅 ${p.fecha_del_pedido} → ${p.fecha_de_entrega || 'Pendiente'}</div></div><div class="text-right"><div class="historial-total">$${parseFloat(p.Total_pago).toFixed(2)}</div><span class="estado-badge estado-${p.estado}">${p.estado}</span></div></div>
+                `).join('');
+            } catch { container.innerHTML = '<div class="text-center" style="color:var(--rojo)">Error</div>'; }
+        }
+        
+        // Admin
+        async function cargarReporte(endpoint) {
+            try {
+                const res = await fetch(`${API}/${endpoint}`);
+                const data = await res.json();
+                const head = document.getElementById('report-head');
+                const body = document.getElementById('report-body');
+                if (!data.length) { body.innerHTML = '<tr><td colspan="100%" style="padding:1rem">Sin datos</td></tr>'; return; }
+                const cols = Object.keys(data[0]);
+                head.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
+                body.innerHTML = data.map(row => `<tr>${cols.map(c => `<td>${row[c] ?? '—'}</td>`).join('')}</tr>`).join('');
+            } catch { toast('Error al cargar reporte', 'error'); }
+        }
+        
+        // ========== NUEVAS FUNCIONES PARA REPORTES ADMIN ==========
+
+        // Limpiar tabla de resultados
+        function limpiarTabla() {
+            document.getElementById('report-head').innerHTML = '';
+            document.getElementById('report-body').innerHTML = '<tr><td colspan="100%" style="padding:1rem;text-align:center">Selecciona un reporte</td></tr>';
+        }
+
+        // Modal para selector de producto
+        function mostrarSelectorProducto() {
+            document.getElementById('modal-producto').classList.remove('hidden');
+        }
+
+        function cerrarModalProducto() {
+            document.getElementById('modal-producto').classList.add('hidden');
+            document.getElementById('producto-id').value = '';
+        }
+
+        async function cargarHistorialProducto() {
+            const productId = document.getElementById('producto-id').value;
+            if (!productId) {
+                toast('Ingresa un ID de producto', 'error');
+                return;
+            }
+            cerrarModalProducto();
+            
+            try {
+                const res = await fetch(`${API}/productos/historial/${productId}`);
+                const data = await res.json();
+                renderizarTabla(data);
+                if (data.length === 0) toast('No hay movimientos para este producto', 'error');
+            } catch (err) {
+                toast('Error al cargar historial del producto', 'error');
+            }
+        }
+
+        // Función mejorada para cargar cualquier reporte
+        async function cargarReporte(endpoint) {
+            const tablaHead = document.getElementById('report-head');
+            const tablaBody = document.getElementById('report-body');
+            
+            tablaBody.innerHTML = '<tr><td colspan="100%" style="padding:2rem;text-align:center"><div class="spinner"></div> Cargando...</td></tr>';
+            
+            try {
+                const res = await fetch(`${API}/${endpoint}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                
+                if (!data || data.length === 0) {
+                    tablaBody.innerHTML = '<tr><td colspan="100%" style="padding:1rem;text-align:center;color:var(--texto-sec)">Sin datos disponibles</td></tr>';
+                    tablaHead.innerHTML = '';
+                    return;
+                }
+                
+                const columnas = Object.keys(data[0]);
+                tablaHead.innerHTML = `<tr>${columnas.map(col => `<th>${col}</th>`).join('')}</tr>`;
+                tablaBody.innerHTML = data.map(fila => `
+                    <tr>${columnas.map(col => `<td>${fila[col] ?? '—'}</td>`).join('')}</tr>
+                `).join('');
+                
+            } catch (err) {
+                console.error(`Error en ${endpoint}:`, err);
+                tablaBody.innerHTML = `<tr><td colspan="100%" style="padding:1rem;text-align:center;color:var(--rojo)">Error al cargar: ${err.message}</td></tr>`;
+                toast(`Error al cargar ${endpoint}`, 'error');
+            }
+        }
+
+        // Función mejorada para renderizar tabla (reemplaza la existente)
+        function renderizarTabla(data) {
+            const head = document.getElementById('report-head');
+            const body = document.getElementById('report-body');
+            
+            if (!data || data.length === 0) {
+                body.innerHTML = '<tr><td colspan="100%" style="padding:1rem;text-align:center;color:var(--texto-sec)">Sin datos</td></tr>';
+                head.innerHTML = '';
+                return;
+            }
+            
+            const columnas = Object.keys(data[0]);
+            head.innerHTML = `<tr>${columnas.map(c => `<th>${c}</th>`).join('')}</tr>`;
+            body.innerHTML = data.map(fila => `
+                <tr>${columnas.map(c => `<td>${fila[c] ?? '—'}</td>`).join('')}</tr>
+            `).join('');
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // Cerrar selectores al hacer clic fuera
+        document.addEventListener('click', () => document.querySelectorAll('.edition-picker').forEach(p => p.classList.remove('open')));
+    </script>
+</body>
+</html>
