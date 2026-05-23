@@ -826,3 +826,59 @@ BEGIN
     END CATCH
 END;
 GO
+
+-- ============================================================
+-- 7. TRIGGER PARA DISMINUIR INVENTARIO AL ENTREGAR EL PEDIDO
+-- ============================================================
+IF OBJECT_ID('Venta.trg_Pedido_entregado', 'TR') IS NOT NULL
+    DROP TRIGGER Venta.trg_Pedido_entregado;
+GO
+
+CREATE TRIGGER trg_Pedido_entregado
+on Venta.Pedido 
+AFTER UPDATE 
+as 
+begin
+    SET NOCOUNT ON;
+    IF EXISTS( 
+        select 1 from inserted i  
+        join deleted d on d.pedido_id = i.pedido_id
+        where i.estado = 'entregado' and d.estado <> 'entregado'
+    )
+    BEGIN
+        BEGIN TRY
+            BEGIN TRANSACTION;
+                -- verificar si tiene promo y si tiene verificar si esta dentro de la fecha de la promo
+                IF EXISTS (
+                    SELECT 1 
+                    FROM inserted i
+                    INNER JOIN Marketing.Promocion mp ON i.promocionid = mp.promocionid
+                    WHERE i.fecha_de_entrega > mp.fecha_fin
+                )
+                BEGIN
+                    RAISERROR('se intento agregar una promo que ya expiro para la fecha de entrega', 16, 1);
+                END
+
+                INSERT INTO Product.MovimientoInventario (productid, edicionproductid, cantidad, fecha, provedorid)
+                SELECT 
+                    det.productoid,
+                    COALESCE(det.edicionproductid, ep.edicionproductid),
+                    det.cantidad_pedida,
+                    CAST(GETDATE() AS DATE),
+                    NULL
+                FROM Venta.PedidoDetalles det  
+                LEFT JOIN Product.EdicionProduct ep ON ep.productid = det.productoid
+                JOIN inserted i ON i.pedido_id = det.pedido_id
+                JOIN deleted d ON d.pedido_id = i.pedido_id
+                WHERE i.estado = 'entregado' AND d.estado <> 'entregado';
+
+            COMMIT TRANSACTION;
+        END TRY
+        BEGIN CATCH
+            IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+            DECLARE @err NVARCHAR(MAX) = ERROR_MESSAGE();
+            RAISERROR(@err, 16, 1);
+        END CATCH
+    END
+end;
+GO
