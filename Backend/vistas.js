@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { sql, poolPromise } = require('./database');
+const { sql } = require('./database');
 
 /// 12. Directorio completo de clientes (Nombre, País, Estado)
 router.get('/reportes/directorio-clientes', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         let result = await pool.request()
             .query('SELECT * FROM VW_Directorio_clientes'); // Consulta directa a la vista
         
@@ -18,7 +18,7 @@ router.get('/reportes/directorio-clientes', async (req, res) => {
 // 13. Reporte detallado de ingresos por pedido
 router.get('/reportes/ingresos-pedidos', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         let result = await pool.request()
             .query('SELECT * FROM VW_Reporte_ingresos');
         
@@ -31,7 +31,7 @@ router.get('/reportes/ingresos-pedidos', async (req, res) => {
 // 14. Ingresos totales generados por cada Juego/DLC
 router.get('/reportes/ventas-por-juego', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         let result = await pool.request()
             .query('SELECT * FROM VW_Ingresos_Por_Juego');
         
@@ -45,7 +45,7 @@ router.get('/reportes/ventas-por-juego', async (req, res) => {
 // Basado en: VW_TODAS_Juegos_ED_DLC
 router.get('/reportes/catalogo-jerarquia', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request()
             .query('SELECT * FROM VW_TODAS_Juegos_ED_DLC');
         res.json(result.recordset);
@@ -58,7 +58,7 @@ router.get('/reportes/catalogo-jerarquia', async (req, res) => {
 // Basado en: sp_mostrar_juegos_stock_bajo (que usa la vista VW_Juegos_Stock_Bajo)
 router.get('/reportes/stock-bajo', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request()
             .execute('sp_mostrar_juegos_stock_bajo'); // Nota: Aquí usamos .execute porque es un SP
         res.json(result.recordset);
@@ -71,7 +71,7 @@ router.get('/reportes/stock-bajo', async (req, res) => {
 // Basado en: VW_Juegos_Stock_Bajo
 router.get('/reportes/vista-stock-bajo', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request()
             .query('SELECT * FROM VW_Juegos_Stock_Bajo');
         res.json(result.recordset);
@@ -85,7 +85,7 @@ router.get('/reportes/vista-stock-bajo', async (req, res) => {
 // Nota: En tu SQL estaba comentada, pero aquí la habilitamos si la vista existe en DB
 router.get('/reportes/alertas-inventario', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request()
             .query('SELECT * FROM Product.v.AlertasInventario');
         res.json(result.recordset);
@@ -93,7 +93,5 @@ router.get('/reportes/alertas-inventario', async (req, res) => {
         res.status(500).json({ error: "La vista AlertasInventario no existe o está incompleta en SQL" });
     }
 });
-
-
 
 module.exports = router;

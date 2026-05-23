@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { sql, poolPromise } = require('./database');
+const { sql } = require('./database');
+
 
 // ============================================================
 // CLIENTES
@@ -10,7 +11,7 @@ const { sql, poolPromise } = require('./database');
 router.post('/clientes', async (req, res) => {
     const { nombre, medio, apellido, correo, paisid, numero_contacto, contrasena } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('nombre', sql.VarChar(50), nombre)
             .input('medio', sql.VarChar(50), medio)
@@ -29,7 +30,7 @@ router.post('/clientes', async (req, res) => {
 // 2. Desactivar cliente (soft delete)
 router.put('/clientes/desactivar/:id', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('clienteid', sql.Int, req.params.id)
             .execute('EliminarCliente');
@@ -42,7 +43,7 @@ router.put('/clientes/desactivar/:id', async (req, res) => {
 // 3. Obtener métodos de pago de un cliente
 router.get('/clientes/:id/pagos', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request()
             .input('Cliente_id', sql.Int, req.params.id)
             .execute('Metodos_pagos_Cliente');
@@ -55,7 +56,7 @@ router.get('/clientes/:id/pagos', async (req, res) => {
 // 4. Historial de pedidos entregados
 router.get('/clientes/:id/pedidos-entregados', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request()
             .input('cliente', sql.Int, req.params.id)
             .execute('Historialdepedidosenviados');
@@ -68,7 +69,7 @@ router.get('/clientes/:id/pedidos-entregados', async (req, res) => {
 // 5. Borrado permanente (peligroso)
 router.delete('/clientes/limpieza-total/:id', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('clienteid', sql.Int, req.params.id)
             .execute('NosoftcleanCliente');
@@ -86,7 +87,7 @@ router.delete('/clientes/limpieza-total/:id', async (req, res) => {
 router.post('/pagos', async (req, res) => {
     const { cliente_id, id_metodo, numero_tarjeta, cvv, fecha_vencimiento } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('cliente_id', sql.Int, cliente_id)
             .input('id_metodo', sql.Int, id_metodo)
@@ -105,7 +106,7 @@ router.post('/pagos', async (req, res) => {
 router.delete('/clientes/pagos', async (req, res) => {
     const { cliente_id, id_metodo, numero_tarjeta } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('cliente_id', sql.Int, cliente_id)
             .input('id_metodo', sql.Int, id_metodo)
@@ -124,7 +125,7 @@ router.delete('/clientes/pagos', async (req, res) => {
 // 8. Catálogo completo (juegos, ediciones, DLCs)
 router.get('/juegos/todo', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().execute('sp_mostrar_juegos_ED_DLC');
         res.json(result.recordset);
     } catch (err) {
@@ -135,7 +136,7 @@ router.get('/juegos/todo', async (req, res) => {
 // 9. Stock bajo
 router.get('/juegos/stock-bajo', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().execute('sp_mostrar_juegos_stock_bajo');
         res.json(result.recordset);
     } catch (err) {
@@ -148,7 +149,7 @@ router.get('/productos/:id/ediciones', async (req, res) => {
     const productId = req.params.id;
     console.log('ID recibido:', productId, 'tipo:', typeof productId);
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         console.log('Pool obtenido');
         const result = await pool.request()
             .input('productid', sql.Int, productId)
@@ -167,7 +168,7 @@ router.get('/productos/:id/ediciones', async (req, res) => {
 // 11. Historial de movimientos de un producto
 router.get('/productos/historial/:id', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request()
             .input('productid', sql.Int, req.params.id)
             .execute('Product.HistorialMovimientosProducto');
@@ -184,7 +185,7 @@ router.get('/productos/historial/:id', async (req, res) => {
 // 12. Obtener carrito activo del cliente
 router.get('/clientes/:id/carrito', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request()
             .input('clienteid', sql.Int, req.params.id)
             .execute('ObtenerCarritoActivo');
@@ -218,7 +219,7 @@ router.get('/clientes/:id/carrito', async (req, res) => {
 // 13. Crear un nuevo carrito
 router.post('/clientes/:id/carrito', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request()
             .input('clienteid', sql.Int, req.params.id)
             .output('carro_id', sql.Int)
@@ -233,7 +234,7 @@ router.post('/clientes/:id/carrito', async (req, res) => {
 router.post('/carrito/:carro_id/items', async (req, res) => {
     const { productoid, cantidad_pedida, precio_prod } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('carro_id', sql.Int, req.params.carro_id)
             .input('productoid', sql.Int, productoid)
@@ -249,7 +250,7 @@ router.post('/carrito/:carro_id/items', async (req, res) => {
 // 15. Eliminar item del carrito
 router.delete('/carrito/:carro_id/items/:detallesid', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('detallesid', sql.Int, req.params.detallesid)
             .input('carro_id', sql.Int, req.params.carro_id)
@@ -267,7 +268,7 @@ router.put('/carrito/:carro_id/confirmar', async (req, res) => {
         return res.status(400).json({ error: 'Método de pago requerido' });
     }
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request()
             .input('carro_id', sql.Int, req.params.carro_id)
             .input('metodo_pago_id', sql.Int, metodo_pago_id)
@@ -305,7 +306,7 @@ router.put('/carrito/:carro_id/confirmar', async (req, res) => {
 // 17. Promociones vigentes
 router.get('/promociones/vigentes', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().execute('ObtenerPromocionesVigentes');
         res.json(result.recordset);
     } catch (err) {
@@ -318,7 +319,7 @@ router.get('/promociones/vigentes', async (req, res) => {
 router.post('/pedidos/aplicar-promocion', async (req, res) => {
     const { pedido_id, promocion_id } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('pedido_id', sql.Int, pedido_id)
             .input('promocion_id', sql.Int, promocion_id)
@@ -341,7 +342,7 @@ router.post('/login', async (req, res) => {
         return res.status(400).json({ error: 'Email requerido' });
     }
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request()
             .input('email', sql.VarChar(50), email)
             .input('contrasena', sql.VarChar(255), contrasena || null)
@@ -361,7 +362,7 @@ router.post('/login', async (req, res) => {
 // 20. Lista de países
 router.get('/paises', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().execute('ObtenerPaises');
         res.json(result.recordset);
     } catch (err) {
@@ -377,7 +378,7 @@ router.get('/paises', async (req, res) => {
 // 21. Directorio de clientes
 router.get('/reportes/directorio-clientes', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().query('SELECT * FROM VW_Directorio_clientes');
         res.json(result.recordset);
     } catch (err) {
@@ -388,7 +389,7 @@ router.get('/reportes/directorio-clientes', async (req, res) => {
 // 22. Ingresos por pedido
 router.get('/reportes/ingresos-pedidos', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().query('SELECT * FROM VW_Reporte_ingresos');
         res.json(result.recordset);
     } catch (err) {
@@ -399,7 +400,7 @@ router.get('/reportes/ingresos-pedidos', async (req, res) => {
 // 23. Ingresos por juego/DLC
 router.get('/reportes/ventas-por-juego', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().query('SELECT * FROM VW_Ingresos_Por_Juego');
         res.json(result.recordset);
     } catch (err) {
@@ -410,7 +411,7 @@ router.get('/reportes/ventas-por-juego', async (req, res) => {
 // 24. Catálogo jerárquico (vista)
 router.get('/reportes/catalogo-jerarquia', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().query('SELECT * FROM VW_TODAS_Juegos_ED_DLC');
         res.json(result.recordset);
     } catch (err) {
@@ -421,7 +422,7 @@ router.get('/reportes/catalogo-jerarquia', async (req, res) => {
 // 25. Productos abandonados
 router.get('/reportes/productos-abandonados', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().execute('Venta.ProductosRetiradosCarrito');
         res.json(result.recordset);
     } catch (err) {
@@ -432,7 +433,7 @@ router.get('/reportes/productos-abandonados', async (req, res) => {
 // 26. Reporte de Auditoría
 router.get('/reportes/auditoria', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().query('SELECT * FROM dbo.Auditoria ORDER BY fecha DESC');
         res.json(result.recordset);
     } catch (err) {
@@ -447,7 +448,7 @@ router.get('/reportes/auditoria', async (req, res) => {
 // Todos los pedidos del cliente sin filtrar por estado
 router.get('/clientes/:id/pedidos', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request()
             .input('clienteid', sql.Int, req.params.id)
             .query(`
@@ -469,7 +470,7 @@ router.get('/clientes/:id/pedidos', async (req, res) => {
 // Entregar Pedido (pendiente -> entregado)
 router.put('/pedidos/:id/entregar', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('pedido_id', sql.Int, req.params.id)
             .execute('dbo.EntregarPedido');
@@ -483,7 +484,7 @@ router.put('/pedidos/:id/entregar', async (req, res) => {
 router.put('/inventario/stock', async (req, res) => {
     const { productid, edicionproductid, cantidad } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('productid', sql.Int, productid || null)
             .input('edicionproductid', sql.Int, edicionproductid || null)
@@ -498,7 +499,7 @@ router.put('/inventario/stock', async (req, res) => {
 // Obtener Lista de Inventario para Gestión de Stock
 router.get('/inventario/lista', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().query(`
             SELECT 
                 i.inventoryid,
@@ -527,9 +528,9 @@ router.get('/inventario/lista', async (req, res) => {
 
 // 1. Crear producto
 router.post('/admin/productos', async (req, res) => {
-    const { name, developerid, tipo_juego, juego_base, precio_base, fecha_de_lanzamiento } = req.body;
+    const { name, developerid, tipo_juego, juego_base, precio_base, fecha_de_lanzamiento, paisid } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('name', sql.VarChar(50), name)
             .input('developerid', sql.Int, developerid)
@@ -537,6 +538,7 @@ router.post('/admin/productos', async (req, res) => {
             .input('juego_base', sql.Int, juego_base || null)
             .input('precio_base', sql.Decimal(10, 2), precio_base || null)
             .input('fecha_de_lanzamiento', sql.Date, fecha_de_lanzamiento || null)
+            .input('paisid', sql.Int, paisid || null)
             .execute('dbo.CrearProductoAdmin');
         res.status(201).json({ mensaje: "Producto creado con éxito." });
     } catch (err) {
@@ -544,11 +546,12 @@ router.post('/admin/productos', async (req, res) => {
     }
 });
 
+
 // 2. Activar / Desactivar producto
 router.put('/admin/productos/:id/estado', async (req, res) => {
     const { estado } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('productid', sql.Int, req.params.id)
             .input('estado', sql.VarChar(20), estado)
@@ -563,7 +566,7 @@ router.put('/admin/productos/:id/estado', async (req, res) => {
 router.post('/admin/pagos', async (req, res) => {
     const { nombre } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('nombre', sql.VarChar(30), nombre)
             .execute('dbo.CrearMetodoPagoAdmin');
@@ -577,7 +580,7 @@ router.post('/admin/pagos', async (req, res) => {
 router.put('/admin/pagos/:id/estado', async (req, res) => {
     const { estado } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('id_metodo', sql.Int, req.params.id)
             .input('estado', sql.VarChar(20), estado)
@@ -592,7 +595,7 @@ router.put('/admin/pagos/:id/estado', async (req, res) => {
 router.post('/admin/promociones', async (req, res) => {
     const { nombre, descuento, fecha_inicio, fecha_fin } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('nombre', sql.VarChar(50), nombre)
             .input('descuento', sql.Decimal(5, 2), descuento)
@@ -609,7 +612,7 @@ router.post('/admin/promociones', async (req, res) => {
 router.put('/admin/promociones/:id/estado', async (req, res) => {
     const { estado } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('promocionid', sql.Int, req.params.id)
             .input('estado', sql.VarChar(20), estado)
@@ -624,7 +627,7 @@ router.put('/admin/promociones/:id/estado', async (req, res) => {
 router.post('/admin/ediciones', async (req, res) => {
     const { name } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('name', sql.VarChar(20), name)
             .execute('dbo.CrearEdicionAdmin');
@@ -638,7 +641,7 @@ router.post('/admin/ediciones', async (req, res) => {
 router.put('/admin/ediciones/:id/estado', async (req, res) => {
     const { estado } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('edicionid', sql.Int, req.params.id)
             .input('estado', sql.VarChar(20), estado)
@@ -653,7 +656,7 @@ router.put('/admin/ediciones/:id/estado', async (req, res) => {
 router.post('/admin/productos-ediciones', async (req, res) => {
     const { productid, edicionid, precio, fecha_lanzamiento } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('productid', sql.Int, productid)
             .input('edicionid', sql.Int, edicionid)
@@ -672,7 +675,7 @@ router.post('/admin/productos-ediciones', async (req, res) => {
 
 router.get('/developers', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().query('SELECT developerid, name FROM Product.Developer ORDER BY name');
         res.json(result.recordset);
     } catch (err) {
@@ -682,7 +685,7 @@ router.get('/developers', async (req, res) => {
 
 router.get('/categorias', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().query('SELECT id_categoria, nombre FROM Product.Categoria ORDER BY nombre');
         res.json(result.recordset);
     } catch (err) {
@@ -692,7 +695,7 @@ router.get('/categorias', async (req, res) => {
 
 router.get('/plataformas', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().query('SELECT id_plataforma, nombre FROM Product.Plataforma ORDER BY nombre');
         res.json(result.recordset);
     } catch (err) {
@@ -702,7 +705,7 @@ router.get('/plataformas', async (req, res) => {
 
 router.get('/ediciones/lista', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().query('SELECT edicionid, name, estado FROM Product.Edicion ORDER BY name');
         res.json(result.recordset);
     } catch (err) {
@@ -712,7 +715,7 @@ router.get('/ediciones/lista', async (req, res) => {
 
 router.get('/productos/lista', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().query("SELECT productid, name, estado FROM Product.Product WHERE tipo_juego = 'juego' ORDER BY name");
         res.json(result.recordset);
     } catch (err) {
@@ -722,7 +725,7 @@ router.get('/productos/lista', async (req, res) => {
 
 router.get('/promociones/lista', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().query("SELECT promocionid, nombre, descuento, fecha_inicio, fecha_fin, estado FROM Marketing.Promocion ORDER BY nombre");
         res.json(result.recordset);
     } catch (err) {
@@ -732,7 +735,7 @@ router.get('/promociones/lista', async (req, res) => {
 
 router.get('/pagos/lista', async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         const result = await pool.request().query("SELECT id_metodo, nombre, estado FROM Metodo_Pago ORDER BY nombre");
         res.json(result.recordset);
     } catch (err) {
@@ -748,7 +751,7 @@ router.get('/pagos/lista', async (req, res) => {
 router.post('/pedidos/asignar-metodo-pago', async (req, res) => {
     const { metododepago, pedidoid } = req.body;
     try {
-        const pool = await poolPromise;
+        const pool = req.dbPool;
         await pool.request()
             .input('metododepago', sql.Int, metododepago)
             .input('pedidoid', sql.Int, pedidoid)
