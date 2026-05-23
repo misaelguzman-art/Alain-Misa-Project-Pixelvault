@@ -882,3 +882,133 @@ begin
     END
 end;
 GO
+
+-- ============================================================
+-- 6. CORRECCIÓN DEL TRIGGER DE MOVIMIENTO DE INVENTARIO
+-- ============================================================
+IF OBJECT_ID('Product.trg_MovimientoInventario', 'TR') IS NOT NULL
+    DROP TRIGGER Product.trg_MovimientoInventario;
+GO
+
+CREATE TRIGGER Product.trg_MovimientoInventario
+ON Product.MovimientoInventario
+INSTEAD OF INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Variables
+    DECLARE @id_prod INT, @id_edicion INT, @cant_movimiento INT, @stock_actual INT, @prov INT;
+
+    SELECT 
+        @id_prod = productid, 
+        @id_edicion = edicionproductid, 
+        @cant_movimiento = cantidad,
+        @prov = provedorid
+    FROM inserted;
+
+    -- NORMALIZACIÓN DE LLAVES SEGÚN DISEÑO:
+    -- 1. Si es juego (edicionproductid no es nulo): productid en Inventario debe ser NULL
+    -- 2. Si es complemento/DLC (edicionproductid es nulo): productid debe ser no nulo, edicionproductid NULL
+    DECLARE @norm_prod_id INT = NULL;
+    DECLARE @norm_edicion_id INT = NULL;
+
+    IF @id_edicion IS NOT NULL
+    BEGIN
+        SET @norm_prod_id = NULL;
+        SET @norm_edicion_id = @id_edicion;
+    END
+    ELSE
+    BEGIN
+        SET @norm_prod_id = @id_prod;
+        SET @norm_edicion_id = NULL;
+    END
+
+    -- 1. Obtener el stock actual
+    IF @norm_edicion_id IS NOT NULL
+    BEGIN
+        SET @stock_actual = ISNULL((SELECT cantidad FROM Product.Inventario WITH (UPDLOCK) WHERE productid IS NULL AND edicionproductid = @norm_edicion_id), 0);
+    END
+    ELSE
+    BEGIN
+        SET @stock_actual = ISNULL((SELECT cantidad FROM Product.Inventario WITH (UPDLOCK) WHERE productid = @norm_prod_id AND edicionproductid IS NULL), 0);
+    END
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- SI EL PROVEEDOR ES NULL (SALIDA)
+        IF @prov IS NULL
+        BEGIN   
+            -- ¿Hay suficiente stock?
+            IF @stock_actual < @cant_movimiento
+            BEGIN
+                RAISERROR('Error: No hay suficiente stock en inventario para realizar esta salida.', 16, 1);
+            END
+
+            -- Restar del inventario
+            IF @norm_edicion_id IS NOT NULL
+            BEGIN
+                UPDATE Product.Inventario
+                SET cantidad = cantidad - @cant_movimiento
+                WHERE productid IS NULL AND edicionproductid = @norm_edicion_id;
+            END
+            ELSE
+            BEGIN
+                UPDATE Product.Inventario
+                SET cantidad = cantidad - @cant_movimiento
+                WHERE productid = @norm_prod_id AND edicionproductid IS NULL;
+            END
+        END
+        
+        -- SI EL PROVEEDOR NO ES NULL (ENTRADA)
+        ELSE 
+        BEGIN  
+            -- Verificar si el registro existe en inventario
+            DECLARE @exists BIT = 0;
+            IF @norm_edicion_id IS NOT NULL
+            BEGIN
+                IF EXISTS (SELECT 1 FROM Product.Inventario WHERE productid IS NULL AND edicionproductid = @norm_edicion_id)
+                    SET @exists = 1;
+            END
+            ELSE
+            BEGIN
+                IF EXISTS (SELECT 1 FROM Product.Inventario WHERE productid = @norm_prod_id AND edicionproductid IS NULL)
+                    SET @exists = 1;
+            END
+
+            IF @exists = 1
+            BEGIN
+                IF @norm_edicion_id IS NOT NULL
+                BEGIN
+                    UPDATE Product.Inventario
+                    SET cantidad = cantidad + @cant_movimiento
+                    WHERE productid IS NULL AND edicionproductid = @norm_edicion_id;
+                END
+                ELSE
+                BEGIN
+                    UPDATE Product.Inventario
+                    SET cantidad = cantidad + @cant_movimiento
+                    WHERE productid = @norm_prod_id AND edicionproductid IS NULL;
+                END
+            END
+            ELSE
+            BEGIN
+                INSERT INTO Product.Inventario (productid, edicionproductid, cantidad)
+                VALUES (@norm_prod_id, @norm_edicion_id, @cant_movimiento);
+            END
+        END
+
+        -- Finalmente, insertar el registro en el historial de movimientos
+        INSERT INTO Product.MovimientoInventario (productid, edicionproductid, cantidad, fecha, provedorid)
+        SELECT productid, edicionproductid, cantidad, ISNULL(fecha, GETDATE()), provedorid FROM inserted;
+
+        COMMIT TRANSACTION;
+    END TRY 
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        DECLARE @err NVARCHAR(MAX) = ERROR_MESSAGE();
+        RAISERROR(@err, 16, 1);
+    END CATCH
+END;
+GO
