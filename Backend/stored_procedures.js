@@ -482,9 +482,25 @@ router.put('/pedidos/:id/entregar', async (req, res) => {
 
 // Actualizar Stock de Inventario (Vendedor y Admin)
 router.put('/inventario/stock', async (req, res) => {
-    const { productid, edicionproductid, cantidad } = req.body;
+    const { productid, edicionproductid, cantidad, nodo } = req.body;
     try {
-        const pool = req.dbPool;
+        let pool = req.dbPool;
+        
+        // Si nos pasan un nodo específico (ej: de forma distribuida desde Bolivia hacia Perú), seleccionamos su respectivo pool
+        if (nodo && nodo.toLowerCase() === 'peru') {
+            const { poolPeru } = require('./database');
+            if (!poolPeru.connected) {
+                await poolPeru.connect();
+            }
+            pool = poolPeru;
+        } else if (nodo && nodo.toLowerCase() === 'bolivia') {
+            const { poolBolivia } = require('./database');
+            if (!poolBolivia.connected) {
+                await poolBolivia.connect();
+            }
+            pool = poolBolivia;
+        }
+
         await pool.request()
             .input('productid', sql.Int, productid || null)
             .input('edicionproductid', sql.Int, edicionproductid || null)
@@ -500,7 +516,9 @@ router.put('/inventario/stock', async (req, res) => {
 router.get('/inventario/lista', async (req, res) => {
     try {
         const pool = req.dbPool;
-        const result = await pool.request().query(`
+        const pais = req.headers['x-pais'] || req.query.pais || 'bolivia';
+        
+        const inventarioQuery = `
             SELECT 
                 i.inventoryid,
                 COALESCE(p_ed.name, p_direct.name) AS nombre_producto,
@@ -515,8 +533,33 @@ router.get('/inventario/lista', async (req, res) => {
             LEFT JOIN Product.Product p_ed ON ep.productid = p_ed.productid
             LEFT JOIN Product.Edicion ed ON ep.edicionid = ed.edicionid
             ORDER BY nombre_producto, nombre_edicion
-        `);
-        res.json(result.recordset);
+        `;
+
+        let list = [];
+
+        // 1. Obtener inventario del nodo local
+        const resultLocal = await pool.request().query(inventarioQuery);
+        const localItems = resultLocal.recordset.map(item => ({ ...item, nodo: pais.toLowerCase() }));
+        list.push(...localItems);
+
+        // 2. Si estamos en Bolivia (Central), también intentamos cargar el inventario de Perú (Sucursal)
+        if (pais.toLowerCase() === 'bolivia') {
+            try {
+                const { poolPeru } = require('./database');
+                // Conectar si no está conectado
+                if (!poolPeru.connected) {
+                    await poolPeru.connect();
+                }
+                const resultPeru = await poolPeru.request().query(inventarioQuery);
+                const peruItems = resultPeru.recordset.map(item => ({ ...item, nodo: 'peru' }));
+                list.push(...peruItems);
+            } catch (peruErr) {
+                console.log('⚠️ No se pudo conectar al nodo de Perú para obtener su inventario (Sucursal offline):', peruErr.message);
+                // No lanzamos error para que Bolivia pueda seguir administrando su stock local
+            }
+        }
+
+        res.json(list);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
