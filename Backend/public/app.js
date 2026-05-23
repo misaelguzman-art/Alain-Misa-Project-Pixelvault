@@ -544,21 +544,74 @@ class App {
             if (!data || !data.length) { body.innerHTML = '<tr><td colspan="100%" style="padding:1rem;text-align:center">Sin datos disponibles</td></tr>'; head.innerHTML = ''; return; }
             let cols = Object.keys(data[0]);
             
+            // Mapeo de nombres feos a nombres bonitos y profesionales
+            const niceNames = {
+                // Auditoria
+                'id_auditoria': 'ID',
+                'tabla_afectada': 'Tabla Afectada',
+                'operacion': 'Operación',
+                'fecha': 'Fecha y Hora',
+                'usuario': 'Usuario DB',
+                'detalle': 'Detalles del Evento',
+                
+                // Directorio clientes
+                'Id_cliente': 'ID',
+                'primer_nombre': 'Nombre',
+                'apellido': 'Apellido',
+                'correo': 'Correo',
+                'telefono': 'Teléfono',
+                'pais': 'País',
+                'estado_usuario': 'Estado',
+
+                // Catálogo jerárquico
+                'nombre_juego': 'Juego / DLC',
+                'tipo_dejuego': 'Tipo',
+                'Cabeza': 'Juego Base',
+                'GrupoOrden': 'Grupo Orden',
+                'EsDLC': 'Es DLC',
+                'pais_ambito': 'Ámbito',
+
+                // General
+                'cantidad': 'Stock',
+                'precio_prod': 'Precio',
+                'Total_pago': 'Ingreso Total',
+                'fecha_del_pedido': 'Fecha Pedido',
+                'fecha_de_entrega': 'Fecha Entrega'
+            };
+
+            const getHeaderName = (c) => niceNames[c] || c.replace(/_/g, ' ').toUpperCase();
+
             let isPedidosReport = endpoint === 'reportes/ingresos-pedidos';
             
+            const formatCell = (val, key) => {
+                if (val === null || val === undefined) return '<span style="color: var(--texto-sec);">—</span>';
+                if (key === 'fecha' || key === 'fecha_del_pedido' || key === 'fecha_de_entrega') {
+                    try { return new Date(val).toLocaleString('es-ES'); } catch { return val; }
+                }
+                if (key === 'operacion') {
+                    let op = val.toString().toUpperCase();
+                    let color = op === 'INSERT' ? 'rgba(16, 185, 129, 0.2); color: #34d399;' : (op === 'UPDATE' ? 'rgba(245, 158, 11, 0.2); color: #fbbf24;' : 'rgba(239, 68, 68, 0.2); color: #f87171;');
+                    return `<span class="tag" style="background: ${color} font-weight: 700; border: 1px solid var(--borde); text-transform: uppercase;">${op}</span>`;
+                }
+                if (key === 'tabla_afectada') {
+                    return `<code style="font-family: Consolas, monospace; background: var(--surface2); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--borde); font-size: 0.85rem;">${val}</code>`;
+                }
+                return val;
+            };
+
             if (isPedidosReport) {
-                head.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}<th>Acción</th></tr>`;
+                head.innerHTML = `<tr>${cols.map(c => `<th>${getHeaderName(c)}</th>`).join('')}<th>Acción</th></tr>`;
                 body.innerHTML = data.map(row => {
                     let pedId = row['Id_Pedido'] || row['pedido_id'] || row['Pedido_ID'] || row['id_pedido'];
                     let estado = row['Estado_Pedido'] || row['estado_pedido'] || row['Estado'] || row['estado'];
                     let actionBtn = (estado && estado.toLowerCase() === 'pendiente' && pedId)
                         ? `<button class="btn btn-exito" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="entregarPedido(${pedId})">Entregar</button>`
                         : `<span style="color: var(--texto-sec);">—</span>`;
-                    return `<tr>${cols.map(c => `<td>${row[c] ?? '—'}</td>`).join('')}<td>${actionBtn}</td></tr>`;
+                    return `<tr>${cols.map(c => `<td>${formatCell(row[c], c)}</td>`).join('')}<td>${actionBtn}</td></tr>`;
                 }).join('');
             } else {
-                head.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
-                body.innerHTML = data.map(row => `<tr>${cols.map(c => `<td>${row[c] ?? '—'}</td>`).join('')}</tr>`).join('');
+                head.innerHTML = `<tr>${cols.map(c => `<th>${getHeaderName(c)}</th>`).join('')}</tr>`;
+                body.innerHTML = data.map(row => `<tr>${cols.map(c => `<td>${formatCell(row[c], c)}</td>`).join('')}</tr>`).join('');
             }
         } catch (err) { body.innerHTML = `<tr><td colspan="100%" style="padding:1rem;text-align:center;color:var(--rojo)">Error: ${err.message}</td></tr>`; this.toast('Error al cargar reporte', 'error'); }
     }
