@@ -1,0 +1,535 @@
+
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<title>Documentación Oficial del Proyecto PixelVault</title>
+<style>
+    body {
+        font-family: 'Segoe UI', Arial, sans-serif;
+        color: #333333;
+        line-height: 1.6;
+        margin: 1.5in 1in 1.5in 1in;
+    }
+    h1 {
+        font-family: 'Segoe UI Light', 'Helvetica Neue', sans-serif;
+        color: #1a365d;
+        font-size: 26pt;
+        border-bottom: 2px solid #2b6cb0;
+        padding-bottom: 10px;
+        margin-top: 30pt;
+        margin-bottom: 15pt;
+    }
+    h2 {
+        color: #2b6cb0;
+        font-size: 18pt;
+        margin-top: 25pt;
+        margin-bottom: 12pt;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 5px;
+    }
+    h3 {
+        color: #4a5568;
+        font-size: 14pt;
+        margin-top: 15pt;
+        margin-bottom: 8pt;
+    }
+    p {
+        font-size: 11pt;
+        margin-bottom: 10pt;
+        text-align: justify;
+    }
+    ul, ol {
+        margin-bottom: 10pt;
+        padding-left: 20px;
+    }
+    li {
+        font-size: 11pt;
+        margin-bottom: 5px;
+    }
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 15pt;
+        margin-bottom: 15pt;
+    }
+    th {
+        background-color: #ebf8ff;
+        color: #2b6cb0;
+        font-weight: bold;
+        text-align: left;
+        border: 1px solid #cbd5e0;
+        padding: 8pt;
+        font-size: 10.5pt;
+    }
+    td {
+        border: 1px solid #e2e8f0;
+        padding: 8pt;
+        font-size: 10pt;
+    }
+    tr:nth-child(even) {
+        background-color: #f7fafc;
+    }
+    pre, code {
+        font-family: 'Consolas', 'Courier New', monospace;
+        background-color: #f7fafc;
+        color: #2d3748;
+        font-size: 9.5pt;
+    }
+    pre {
+        border: 1px solid #e2e8f0;
+        padding: 12pt;
+        margin-top: 10pt;
+        margin-bottom: 10pt;
+        background-color: #f7fafc;
+        border-left: 4px solid #3182ce;
+        white-space: pre-wrap;
+    }
+    .badge {
+        padding: 3px 8px;
+        font-size: 9pt;
+        font-weight: bold;
+        border-radius: 3px;
+        color: white;
+    }
+    .badge-primary { background-color: #3182ce; }
+    .badge-success { background-color: #38a169; }
+    .badge-warning { background-color: #dd6b20; }
+    .badge-danger { background-color: #e53e3e; }
+    
+    .cover-page {
+        text-align: center;
+        margin-top: 2in;
+        margin-bottom: 2in;
+        page-break-after: always;
+    }
+    .cover-title {
+        font-size: 36pt;
+        color: #1a365d;
+        font-weight: bold;
+        margin-bottom: 10pt;
+    }
+    .cover-subtitle {
+        font-size: 18pt;
+        color: #4a5568;
+        margin-bottom: 50pt;
+    }
+    .cover-info {
+        font-size: 12pt;
+        color: #718096;
+        margin-top: 100pt;
+    }
+    .page-break {
+        page-break-before: always;
+    }
+</style>
+</head>
+<body>
+
+<div class="cover-page">
+    <div class="cover-title">PIXELVAULT</div>
+    <div class="cover-subtitle">Sistema Distribuido de Catálogo y Ventas de Videojuegos</div>
+    <div style="font-size: 14pt; color: #3182ce; margin-top: 20pt; font-weight: bold;">Documentación Técnica Oficial del Proyecto</div>
+    <div class="cover-info">
+        <p style="text-align: center;"><strong>Asignatura:</strong> Base de Datos II</p>
+        <p style="text-align: center;"><strong>Estudiantes:</strong> Misael Guzmán & Alain Flores</p>
+        <p style="text-align: center;"><strong>Fecha:</strong> Mayo 2026</p>
+        <p style="text-align: center;"><strong>Versión:</strong> 2.0 (Estable y Verificada)</p>
+    </div>
+</div>
+
+<h1>1. Introducción y Arquitectura del Sistema</h1>
+<p>
+    <strong>PixelVault</strong> es una plataforma premium de catálogo, stock y checkout de videojuegos diseñada bajo una arquitectura de <strong>Base de Datos Distribuida</strong>. El sistema está estructurado para operar de manera autónoma en dos nodos geográficos principales: la <strong>Central (Bolivia)</strong> y la <strong>Sucursal (Perú)</strong>, comunicándose e integrando sus catálogos a través de <strong>Servidores Vinculados (Linked Servers)</strong> de SQL Server.
+</p>
+
+<h3>Esquema General de la Arquitectura Distribuida</h3>
+<p>
+    El backend de la aplicación, desarrollado en NodeJS, actúa como un despachador inteligente. Mediante un middleware de enrutamiento dinámico, el sistema lee la procedencia geográfica de la solicitud del usuario (a través de cabeceras HTTP como <code>x-pais</code>) y desvía la conexión al Connection Pool de la base de datos correspondiente:
+</p>
+<ul>
+    <li><strong>Nodo Central (Bolivia - BD2_tienda):</strong> Aloja el catálogo general de videojuegos, los usuarios globales y locales de Bolivia, y los métodos de pago. Permite la administración total de productos globales y locales.</li>
+    <li><strong>Nodo Sucursal (Perú - NodoSucursal):</strong> Hospeda de forma local los clientes y transacciones de Perú, así como sus productos exclusivos. Consume los productos globales de la Central en tiempo real utilizando un Linked Server.</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h1>2. Estructura y Modelo de Datos</h1>
+<p>
+    El diseño de la base de datos está normalizado y segregado en esquemas lógicos para garantizar la mantenibilidad y escalabilidad. A continuación se presentan las tablas principales del sistema organizadas por su esquema:
+</p>
+
+<h2>2.1 Esquema Product (Productos e Inventario)</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Tabla</th>
+            <th>Descripción</th>
+            <th>Campos Clave</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Product.Product</strong></td>
+            <td>Catálogo base de juegos, DLCs y complementos.</td>
+            <td><code>productid (PK)</code>, <code>name</code>, <code>developerid (FK)</code>, <code>tipo_juego</code>, <code>paisid (FK, Nullable)</code></td>
+        </tr>
+        <tr>
+            <td><strong>Product.Edicion</strong></td>
+            <td>Diccionario de ediciones del juego (Estándar, Deluxe, GOTY, etc.).</td>
+            <td><code>edicionid (PK)</code>, <code>name</code>, <code>estado</code></td>
+        </tr>
+        <tr>
+            <td><strong>Product.EdicionProduct</strong></td>
+            <td>Relación intermedia que define el precio de una edición específica de un juego.</td>
+            <td><code>edicionproductid (PK)</code>, <code>productid (FK)</code>, <code>edicionid (FK)</code>, <code>precio</code></td>
+        </tr>
+        <tr>
+            <td><strong>Product.Inventario</strong></td>
+            <td>Registro físico del stock actual de cada juego o DLC.</td>
+            <td><code>inventoryid (PK)</code>, <code>productid (FK, Nullable)</code>, <code>edicionproductid (FK, Nullable)</code>, <code>cantidad</code></td>
+        </tr>
+        <tr>
+            <td><strong>Product.Ejemplar</strong></td>
+            <td>Registro individual de las licencias o claves de canje (CD keys) activas y vendidas.</td>
+            <td><code>id_ejemplar (PK)</code>, <code>edicionproductid (FK)</code>, <code>canjear_codigo</code>, <code>estado</code> ('activo', 'comprado')</td>
+        </tr>
+        <tr>
+            <td><strong>Product.MovimientoInventario</strong></td>
+            <td>Historial de auditoría de entradas y salidas de inventario.</td>
+            <td><code>movimientoid (PK)</code>, <code>productid (FK)</code>, <code>edicionproductid (FK)</code>, <code>cantidad</code>, <code>fecha</code>, <code>provedorid (FK, Nullable)</code></td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>2.2 Esquema Cliente (Usuarios y Métodos de Pago)</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Tabla</th>
+            <th>Descripción</th>
+            <th>Campos Clave</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Cliente.Cliente</strong></td>
+            <td>Registro de usuarios del sistema (Administradores, Vendedores y Clientes).</td>
+            <td><code>Id_cliente (PK)</code>, <code>nombre</code>, <code>email</code>, <code>rol</code>, <code>paisid (FK)</code>, <code>contrasena</code></td>
+        </tr>
+        <tr>
+            <td><strong>Cliente.Cliente_Metodo_Pago</strong></td>
+            <td>Métodos de pago asociados de forma personal a cada cliente.</td>
+            <td><code>cliente_metodo_id (PK)</code>, <code>Id_cliente (FK)</code>, <code>id_metodo (FK)</code>, <code>numero_tarjeta</code></td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>2.3 Esquema Venta (Carrito de Compras y Pedidos)</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Tabla</th>
+            <th>Descripción</th>
+            <th>Campos Clave</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Venta.Carrito</strong></td>
+            <td>Cabecera del carrito activo o completado de un cliente.</td>
+            <td><code>carro_id (PK)</code>, <code>Id_cliente (FK)</code>, <code>estado</code> ('activo', 'en_proceso', 'completado')</td>
+        </tr>
+        <tr>
+            <td><strong>Venta.CarroDetalles</strong></td>
+            <td>Líneas de detalle del carrito conteniendo los juegos agregados.</td>
+            <td><code>detallesid (PK)</code>, <code>carro_id (FK)</code>, <code>productoid (FK)</code>, <code>cantidad_pedida</code>, <code>precio_prod</code></td>
+        </tr>
+        <tr>
+            <td><strong>Venta.Pedido</strong></td>
+            <td>Cabecera del pedido (orden de compra oficial generada tras pagar).</td>
+            <td><code>pedido_id (PK)</code>, <code>Id_cliente (FK)</code>, <code>Total_pago</code>, <code>estado</code> ('pendiente', 'entregado')</td>
+        </tr>
+        <tr>
+            <td><strong>Venta.PedidoDetalles</strong></td>
+            <td>Líneas de detalle del pedido con los productos ordenados.</td>
+            <td><code>pedidodetallesid (PK)</code>, <code>pedido_id (FK)</code>, <code>productoid (FK)</code>, <code>cantidad_pedida</code>, <code>precio_prod</code></td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<h1>3. Lógica Almacenada y Disparadores (Stored Procedures & Triggers)</h1>
+<p>
+    Toda la lógica transaccional fuerte, restricciones de ámbito geográfico, autogeneración de stock, auditorías de sistema y control de inventarios está implementada mediante Stored Procedures y Triggers en T-SQL. A continuación se detallan las piezas fundamentales:
+</p>
+
+<h2>3.1 Procedimiento de Creación de Productos con Stock Inicial</h2>
+<p>
+    El stored procedure <code>dbo.CrearProductoAdmin</code> ha sido diseñado y optimizado para actuar con total seguridad geográfica e inicialización automática de stock:
+</p>
+<pre>
+CREATE OR ALTER PROCEDURE dbo.CrearProductoAdmin
+    @name VARCHAR(50),
+    @developerid INT,
+    @tipo_juego VARCHAR(20) = 'juego',
+    @juego_base INT = NULL,
+    @precio_base DECIMAL(10,2) = NULL,
+    @fecha_de_lanzamiento DATE = NULL,
+    @paisid INT = NULL,
+    @stock_inicial INT = 0
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @PaisLocalID INT = NULL;
+    SELECT TOP 1 @PaisLocalID = pais_local_id FROM dbo.ConfiguracionLocal;
+
+    -- Validación geográfica: Perú no puede crear juegos globales o de otros países
+    IF @PaisLocalID = 4 AND (@paisid IS NULL OR @paisid <> 4)
+    BEGIN
+        THROW 52000, 'La sucursal de Perú solo puede registrar juegos de Perú (no globales ni de otros países).', 1;
+        RETURN;
+    END
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+            INSERT INTO Product.Product (name, developerid, estado, tipo_juego, juego_base, precio_base, fecha_de_lanzamiento, paisid)
+            VALUES (@name, @developerid, 'activo', @tipo_juego, @juego_base, @precio_base, @fecha_de_lanzamiento, @paisid);
+            
+            DECLARE @new_product_id INT = SCOPE_IDENTITY();
+
+            IF @tipo_juego = 'juego'
+            BEGIN
+                DECLARE @estandar_id INT;
+                SELECT TOP 1 @estandar_id = edicionid FROM Product.Edicion WHERE name LIKE '%estandar%' OR name LIKE '%Estandar%' OR name LIKE '%Standard%';
+                IF @estandar_id IS NULL
+                BEGIN
+                    INSERT INTO Product.Edicion (name) VALUES ('Estandar');
+                    SET @estandar_id = SCOPE_IDENTITY();
+                END
+
+                INSERT INTO Product.EdicionProduct (productid, edicionid, precio, fecha_lanzamiento)
+                VALUES (@new_product_id, @estandar_id, ISNULL(@precio_base, 0), ISNULL(@fecha_de_lanzamiento, GETDATE()));
+                
+                DECLARE @new_ep_id INT = SCOPE_IDENTITY();
+
+                -- Si hay stock inicial, registramos movimiento y autogeneramos las CD keys
+                IF @stock_inicial > 0
+                BEGIN
+                    INSERT INTO Product.MovimientoInventario (productid, edicionproductid, cantidad, fecha, provedorid)
+                    VALUES (@new_product_id, @new_ep_id, @stock_inicial, CAST(GETDATE() AS DATE), 2);
+
+                    DECLARE @loop_i INT = 0;
+                    DECLARE @code_prefix VARCHAR(30) = 'KEY-' + CAST(@new_ep_id AS VARCHAR) + '-';
+                    WHILE @loop_i < @stock_inicial
+                    BEGIN
+                        DECLARE @rand_code VARCHAR(50) = @code_prefix + SUBSTRING(REPLACE(CAST(NEWID() AS VARCHAR(36)), '-', ''), 1, 10);
+                        INSERT INTO Product.Ejemplar (productid, edicionproductid, canjear_codigo, estado)
+                        VALUES (NULL, @new_ep_id, UPPER(@rand_code), 'activo');
+                        SET @loop_i = @loop_i + 1;
+                    END
+                END
+                ELSE
+                BEGIN
+                    INSERT INTO Product.Inventario (productid, edicionproductid, cantidad)
+                    VALUES (NULL, @new_ep_id, 0);
+                END
+            END
+            ELSE
+            BEGIN
+                IF @stock_inicial > 0
+                BEGIN
+                    INSERT INTO Product.MovimientoInventario (productid, edicionproductid, cantidad, fecha, provedorid)
+                    VALUES (@new_product_id, NULL, @stock_inicial, CAST(GETDATE() AS DATE), 2);
+
+                    DECLARE @loop_j INT = 0;
+                    DECLARE @code_prefix_dlc VARCHAR(30) = 'KEY-DLC-' + CAST(@new_product_id AS VARCHAR) + '-';
+                    WHILE @loop_j < @stock_inicial
+                    BEGIN
+                        DECLARE @rand_code_dlc VARCHAR(50) = @code_prefix_dlc + SUBSTRING(REPLACE(CAST(NEWID() AS VARCHAR(36)), '-', ''), 1, 10);
+                        INSERT INTO Product.Ejemplar (productid, edicionproductid, canjear_codigo, estado)
+                        VALUES (@new_product_id, NULL, UPPER(@rand_code_dlc), 'activo');
+                        SET @loop_j = @loop_j + 1;
+                    END
+                END
+                ELSE
+                BEGIN
+                    INSERT INTO Product.Inventario (productid, edicionproductid, cantidad)
+                    VALUES (@new_product_id, NULL, 0);
+                END
+            END
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+</pre>
+
+<h2>3.2 Trigger Inteligente de Entrega de Pedidos e Inventarios</h2>
+<p>
+    El trigger <code>Venta.trg_Pedido_entregado</code> actúa de forma automática al cambiar el estado de un pedido a 'entregado'. Se destaca por su capacidad de **resolver dinámicamente el edicionproductid** de la edición estándar del juego a través de un <code>LEFT JOIN</code> en caso de que este llegue como nulo desde el checkout base, y por su catch block protegido contra abortos de transacción:
+</p>
+<pre>
+CREATE TRIGGER trg_Pedido_entregado
+on Venta.Pedido 
+AFTER UPDATE 
+as 
+begin
+    SET NOCOUNT ON;
+    IF EXISTS( 
+        select 1 from inserted i  
+        join deleted d on d.pedido_id = i.pedido_id
+        where i.estado = 'entregado' and d.estado <> 'entregado'
+    )
+    BEGIN
+        BEGIN TRY
+            BEGIN TRANSACTION;
+                -- Verificar promociones vencidas
+                IF EXISTS (
+                    SELECT 1 
+                    FROM inserted i
+                    INNER JOIN Marketing.Promocion mp ON i.promocionid = mp.promocionid
+                    WHERE i.fecha_de_entrega > mp.fecha_fin
+                )
+                BEGIN
+                    RAISERROR('Se intento agregar una promo que ya expiro para la fecha de entrega.', 16, 1);
+                END
+
+                -- Registrar salida de inventario con mapeo dinámico de edición
+                INSERT INTO Product.MovimientoInventario (productid, edicionproductid, cantidad, fecha, provedorid)
+                SELECT 
+                    det.productoid,
+                    COALESCE(det.edicionproductid, ep.edicionproductid),
+                    det.cantidad_pedida,
+                    CAST(GETDATE() AS DATE),
+                    NULL
+                FROM Venta.PedidoDetalles det  
+                LEFT JOIN Product.EdicionProduct ep ON ep.productid = det.productoid
+                JOIN inserted i ON i.pedido_id = det.pedido_id
+                JOIN deleted d ON d.pedido_id = i.pedido_id
+                WHERE i.estado = 'entregado' AND d.estado <> 'entregado';
+
+            COMMIT TRANSACTION;
+        END TRY
+        BEGIN CATCH
+            IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+            DECLARE @err NVARCHAR(MAX) = ERROR_MESSAGE();
+            RAISERROR(@err, 16, 1);
+        END CATCH
+    END
+end;
+</pre>
+
+<div class="page-break"></div>
+
+<h1>4. Integración del Backend en NodeJS</h1>
+<p>
+    El backend está construido modularmente utilizando **Express** y **tedious** (a través de <code>mssql</code>). A continuación se destacan los componentes clave:
+</p>
+
+<h3>4.1 Enrutamiento Dinámico (Backend/middleware.js)</h3>
+<p>
+    Este middleware inyecta dinámicamente el Connection Pool correspondiente al país en la solicitud (<code>req.dbPool</code>):
+</p>
+<pre>
+const { poolBolivia, poolPeru } = require('./database');
+
+module.exports = (req, res, next) => {
+    const pais = req.headers['x-pais'] || req.query.pais || 'bolivia';
+
+    if (pais.toLowerCase() === 'peru') {
+        req.dbPool = poolPeru;
+    } else {
+        req.dbPool = poolBolivia; // Por defecto Bolivia (Central)
+    }
+    
+    next();
+};
+</pre>
+
+<h3>4.2 Conexión Multi-Pool (Backend/database.js)</h3>
+<p>
+    Levanta de forma asíncrona dos Connection Pools individuales a las bases de datos de Bolivia y Perú simultáneamente:
+</p>
+<pre>
+const sql = require('mssql');
+
+const configBolivia = {
+    user: 'Admin', 
+    password: 'admin',
+    server: 'LAPTOP-GGCKNFU6', 
+    database: 'BD2_tienda',
+    options: { encrypt: false, trustServerCertificate: true }
+};
+
+const configPeru = {
+    user: 'Admin', 
+    password: 'admin',
+    server: 'DESKTOP-44CCO3Q', 
+    database: 'NodoSucursal',
+    options: { encrypt: false, trustServerCertificate: true }
+};
+
+const poolBolivia = new sql.ConnectionPool(configBolivia);
+const poolPeru = new sql.ConnectionPool(configPeru);
+
+const poolBoliviaPromise = poolBolivia.connect()
+    .then(pool => { console.log('✅ Conectado a Bolivia (Central)'); return pool; });
+
+const poolPeruPromise = poolPeru.connect()
+    .then(pool => { console.log('✅ Conectado a Perú (Sucursal)'); return pool; });
+
+module.exports = { 
+    sql, 
+    poolBolivia,
+    poolPeru,
+    poolBoliviaPromise,
+    poolPeruPromise
+};
+</pre>
+
+<div class="page-break"></div>
+
+<h1>5. Guía de Uso del Sistema Distribuido</h1>
+<p>
+    Tanto tú como tu colega pueden inicializar el sistema de forma idéntica en sus respectivos ordenadores:
+</p>
+
+<h2>5.1 Inicialización de Base de Datos y Datos Semilla</h2>
+<p>
+    Para levantar la estructura completa de base de datos, configurar los Linked Servers, crear las vistas jerárquicas e insertar los usuarios y claves semilla, ejecuta en la terminal del backend:
+</p>
+<pre>
+-- Para Bolivia (Misael)
+node run_migration.js bolivia
+
+-- Para Perú (Alain)
+node run_migration.js peru
+</pre>
+
+<h2>5.2 Aplicación de Cambios y Mejoras T-SQL</h2>
+<p>
+    Para aplicar los stored procedures premium (como la creación de productos con stock, autogeneración de CD keys, checkout y entrega de pedidos), ejecuta el script compilador:
+</p>
+<pre>
+node scratch/run_sql.js
+</pre>
+
+<h2>5.3 Levantar el Servidor Web</h2>
+<p>
+    Para inicializar el servidor Express que distribuye y enruta las solicitudes a los dos ordenadores, ejecuta:
+</p>
+<pre>
+node server.js
+</pre>
+<p>
+    El frontend de PixelVault se cargará automáticamente en <code>http://localhost:3000</code>. Podrás cambiar dinámicamente de sucursal con el selector de país en la cabecera superior y administrar reportes globales, inventarios locales y realizar compras en tiempo real de forma totalmente distribuida.
+</p>
+
+</body>
+</html>
