@@ -195,72 +195,28 @@ async function run() {
             }
 
             // 5.3 Vista Jerárquica de Catálogo con Columna de Ámbito de País
-            if (targetNode === 'peru') {
-                await request.query(`
-                    CREATE OR ALTER VIEW VW_TODAS_Juegos_ED_DLC AS
-                    WITH catalago_juegos AS (
-                        -- 1. Juegos y Ediciones Locales de Perú
-                        SELECT pp.name AS nombre_juego,
-                               CASE 
-                                   WHEN ep.edicionproductid IS NULL THEN ed.name
-                                   ELSE pp.tipo_juego
-                               END tipo_dejuego,
-                               padre.name AS Cabeza,
-                               pp.paisid
-                        FROM Product.Product pp
-                        LEFT JOIN Product.Product padre ON padre.productid = pp.juego_base
-                        LEFT JOIN Product.EdicionProduct ep ON ep.edicionproductid = pp.productid
-                        LEFT JOIN Product.Edicion ed ON ep.edicionid = ed.edicionid
-                        WHERE pp.paisid = 4
-                        
-                        UNION ALL
-                        
-                        -- 2. Juegos y Ediciones Globales de Bolivia (Linked Server)
-                        SELECT pp.name AS nombre_juego,
-                               CASE 
-                                   WHEN ep.edicionproductid IS NULL THEN ed.name
-                                   ELSE pp.tipo_juego
-                               END tipo_dejuego,
-                               padre.name AS Cabeza,
-                               pp.paisid
-                        FROM [NODO_CENTRAL].[BD2_tienda].[Product].[Product] pp
-                        LEFT JOIN [NODO_CENTRAL].[BD2_tienda].[Product].[Product] padre ON padre.productid = pp.juego_base
-                        LEFT JOIN [NODO_CENTRAL].[BD2_tienda].[Product].[EdicionProduct] ep ON ep.edicionproductid = pp.productid
-                        LEFT JOIN [NODO_CENTRAL].[BD2_tienda].[Product].[Edicion] ed ON ep.edicionid = ed.edicionid
-                        WHERE pp.paisid IS NULL
-                    )
-                    SELECT nombre_juego, tipo_dejuego, Cabeza,
-                           COALESCE(Cabeza, nombre_juego) AS GrupoOrden,
-                           CASE WHEN Cabeza IS NULL THEN 0 ELSE 1 END AS EsDLC,
-                           ISNULL(p.nombre, 'Global') AS pais_ambito
-                    FROM catalago_juegos cj
-                    LEFT JOIN Paises p ON cj.paisid = p.paisid;
-                `);
-            } else {
-                await request.query(`
-                    CREATE OR ALTER VIEW VW_TODAS_Juegos_ED_DLC AS
-                    WITH catalago_juegos AS (
-                        SELECT pp.name AS nombre_juego,
-                               CASE 
-                                   WHEN ep.edicionproductid IS NULL THEN ed.name
-                                   ELSE pp.tipo_juego
-                               END tipo_dejuego,
-                               padre.name AS Cabeza,
-                               pp.paisid
-                        FROM Product.Product pp
-                        LEFT JOIN Product.Product padre ON padre.productid = pp.juego_base
-                        LEFT JOIN Product.EdicionProduct ep ON ep.edicionproductid = pp.productid
-                        LEFT JOIN Product.Edicion ed ON ep.edicionid = ed.edicionid
-                        WHERE pp.paisid = 1 OR pp.paisid IS NULL
-                    )
-                    SELECT nombre_juego, tipo_dejuego, Cabeza,
-                           COALESCE(Cabeza, nombre_juego) AS GrupoOrden,
-                           CASE WHEN Cabeza IS NULL THEN 0 ELSE 1 END AS EsDLC,
-                           ISNULL(p.nombre, 'Global') AS pais_ambito
-                    FROM catalago_juegos cj
-                    LEFT JOIN Paises p ON cj.paisid = p.paisid;
-                `);
-            }
+            await request.query(`
+                CREATE OR ALTER VIEW VW_TODAS_Juegos_ED_DLC AS
+                WITH catalago_juegos AS (
+                    SELECT pp.name AS nombre_juego,
+                           CASE 
+                               WHEN ep.edicionproductid IS NULL THEN ed.name
+                               ELSE pp.tipo_juego
+                           END tipo_dejuego,
+                           padre.name AS Cabeza,
+                           pp.paisid
+                    FROM Product.Product pp
+                    LEFT JOIN Product.Product padre ON padre.productid = pp.juego_base
+                    LEFT JOIN Product.EdicionProduct ep ON ep.edicionproductid = pp.productid
+                    LEFT JOIN Product.Edicion ed ON ep.edicionid = ed.edicionid
+                )
+                SELECT nombre_juego, tipo_dejuego, Cabeza,
+                       COALESCE(Cabeza, nombre_juego) AS GrupoOrden,
+                       CASE WHEN Cabeza IS NULL THEN 0 ELSE 1 END AS EsDLC,
+                       ISNULL(p.nombre, 'Global') AS pais_ambito
+                FROM catalago_juegos cj
+                LEFT JOIN Paises p ON cj.paisid = p.paisid;
+            `);
 
             // ============================================================
             // 6. CREACIÓN DE STORED PROCEDURES DE CONTROL GEOGRÁFICO
