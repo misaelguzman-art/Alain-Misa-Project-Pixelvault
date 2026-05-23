@@ -266,7 +266,8 @@ async function run() {
                     @juego_base INT = NULL,
                     @precio_base DECIMAL(10,2) = NULL,
                     @fecha_de_lanzamiento DATE = NULL,
-                    @paisid INT = NULL
+                    @paisid INT = NULL,
+                    @stock_inicial INT = 0
                 AS
                 BEGIN
                     SET NOCOUNT ON;
@@ -303,15 +304,57 @@ async function run() {
                                 
                                 DECLARE @new_ep_id INT = SCOPE_IDENTITY();
 
-                                -- Inicializar inventario en 0
-                                INSERT INTO Product.Inventario (productid, edicionproductid, cantidad)
-                                VALUES (NULL, @new_ep_id, 0);
+                                -- Auto-generar Ejemplares si hay stock inicial
+                                IF @stock_inicial > 0
+                                BEGIN
+                                    -- Registrar movimiento de inventario (Entrada)
+                                    -- El trigger trg_MovimientoInventario insertará automáticamente la fila en Product.Inventario
+                                    INSERT INTO Product.MovimientoInventario (productid, edicionproductid, cantidad, fecha, provedorid)
+                                    VALUES (@new_product_id, @new_ep_id, @stock_inicial, CAST(GETDATE() AS DATE), 2);
+
+                                    DECLARE @loop_i INT = 0;
+                                    DECLARE @code_prefix VARCHAR(30) = 'KEY-' + CAST(@new_ep_id AS VARCHAR) + '-';
+                                    WHILE @loop_i < @stock_inicial
+                                    BEGIN
+                                        DECLARE @rand_code VARCHAR(50) = @code_prefix + SUBSTRING(REPLACE(CAST(NEWID() AS VARCHAR(36)), '-', ''), 1, 10);
+                                        INSERT INTO Product.Ejemplar (productid, edicionproductid, canjear_codigo, estado)
+                                        VALUES (NULL, @new_ep_id, UPPER(@rand_code), 'activo');
+                                        SET @loop_i = @loop_i + 1;
+                                    END
+                                END
+                                ELSE
+                                BEGIN
+                                    -- Si es 0, inicializar inventario directamente (el trigger no se gatilla)
+                                    INSERT INTO Product.Inventario (productid, edicionproductid, cantidad)
+                                    VALUES (NULL, @new_ep_id, 0);
+                                END
                             END
                             ELSE
                             BEGIN
                                 -- Para DLC o Complemento, inicializar directamente a nivel de producto
-                                INSERT INTO Product.Inventario (productid, edicionproductid, cantidad)
-                                VALUES (@new_product_id, NULL, 0);
+                                -- Registrar movimiento si stock_inicial > 0 y auto-generar llaves
+                                IF @stock_inicial > 0
+                                BEGIN
+                                    -- El trigger trg_MovimientoInventario insertará automáticamente la fila en Product.Inventario
+                                    INSERT INTO Product.MovimientoInventario (productid, edicionproductid, cantidad, fecha, provedorid)
+                                    VALUES (@new_product_id, NULL, @stock_inicial, CAST(GETDATE() AS DATE), 2);
+
+                                    DECLARE @loop_j INT = 0;
+                                    DECLARE @code_prefix_dlc VARCHAR(30) = 'KEY-DLC-' + CAST(@new_product_id AS VARCHAR) + '-';
+                                    WHILE @loop_j < @stock_inicial
+                                    BEGIN
+                                        DECLARE @rand_code_dlc VARCHAR(50) = @code_prefix_dlc + SUBSTRING(REPLACE(CAST(NEWID() AS VARCHAR(36)), '-', ''), 1, 10);
+                                        INSERT INTO Product.Ejemplar (productid, edicionproductid, canjear_codigo, estado)
+                                        VALUES (@new_product_id, NULL, UPPER(@rand_code_dlc), 'activo');
+                                        SET @loop_j = @loop_j + 1;
+                                    END
+                                END
+                                ELSE
+                                BEGIN
+                                    -- Si es 0, inicializar inventario directamente
+                                    INSERT INTO Product.Inventario (productid, edicionproductid, cantidad)
+                                    VALUES (@new_product_id, NULL, 0);
+                                END
                             END
 
                         COMMIT TRANSACTION;
@@ -319,6 +362,146 @@ async function run() {
                     BEGIN CATCH
                         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
                         THROW;
+                    END CATCH
+                END;
+            `);
+
+            // SP ConfirmarCompra para el checkout
+            await request.query(`
+                CREATE OR ALTER PROCEDURE dbo.ConfirmarCompra
+                    @carro_id INT,
+                    @metodo_pago_id INT,
+                    @pedido_id INT OUTPUT,
+                    @total DECIMAL(10,2) OUTPUT,
+                    @codigos_json NVARCHAR(MAX) OUTPUT
+                AS
+                BEGIN
+                    SET NOCOUNT ON;
+                    SET XACT_ABORT ON;
+                    BEGIN TRY
+                        BEGIN TRANSACTION;
+
+                        -- 1. Cambiar estado del carrito a 'en_proceso' (dispara trigger que crea pedido)
+                        UPDATE Venta.Carrito SET estado = 'en_proceso' WHERE carro_id = @carro_id;
+
+                        -- 2. Obtener el pedido recién creado por el trigger
+                        SELECT TOP 1 @pedido_id = pedido_id, @total = Total_pago
+                        FROM Venta.Pedido
+                        WHERE carro_id = @carro_id
+                        ORDER BY pedido_id DESC;
+
+                        IF @pedido_id IS NULL
+                            THROW 50000, 'El trigger no pudo crear el pedido.', 1;
+
+                        -- 3. Asignar método de pago al pedido
+                        EXEC SP_TRG_AsignarMetodoPagoAPedido @metodo_pago_id, @pedido_id;
+
+                        -- 4. Obtener los items del pedido (productoid, edicionproductid, cantidad_pedida)
+                        DECLARE @items TABLE (
+                            idx INT IDENTITY(1,1),
+                            productoid INT,
+                            cantidad_pedida INT,
+                            edicionproductid INT,
+                            nombre_producto VARCHAR(100),
+                            nombre_edicion VARCHAR(50)
+                        );
+
+                        INSERT INTO @items (productoid, cantidad_pedida, edicionproductid, nombre_producto, nombre_edicion)
+                        SELECT 
+                            pd.productoid,
+                            pd.cantidad_pedida,
+                            ep.edicionproductid,
+                            p.name,
+                            e.name
+                        FROM Venta.PedidoDetalles pd
+                        LEFT JOIN Product.EdicionProduct ep ON ep.productid = pd.productoid
+                        LEFT JOIN Product.Product p ON p.productid = pd.productoid
+                        LEFT JOIN Product.Edicion e ON e.edicionid = ep.edicionid
+                        WHERE pd.pedido_id = @pedido_id;
+
+                        -- 5. Tabla temporal para códigos asignados
+                        DECLARE @codigos TABLE (producto NVARCHAR(200), codigo VARCHAR(50));
+
+                        DECLARE @i INT = 1, @max INT;
+                        DECLARE @producto_actual NVARCHAR(200);
+                        DECLARE @cantidad_actual INT;
+                        DECLARE @edicion_actual INT;
+                        DECLARE @productoid_actual INT;
+                        DECLARE @ejemplares TABLE (id INT, codigo VARCHAR(50));
+
+                        SELECT @max = COUNT(*) FROM @items;
+
+                        WHILE @i <= @max
+                        BEGIN
+                            SELECT 
+                                @producto_actual = ISNULL(nombre_producto, '') + ISNULL(' (' + nombre_edicion + ')', ''),
+                                @cantidad_actual = cantidad_pedida,
+                                @edicion_actual = edicionproductid,
+                                @productoid_actual = productoid
+                            FROM @items WHERE idx = @i;
+
+                            IF @producto_actual IS NULL OR @producto_actual = '' 
+                                SET @producto_actual = 'Producto #' + CAST(@productoid_actual AS VARCHAR);
+
+                            DELETE FROM @ejemplares;
+
+                            IF @edicion_actual IS NOT NULL
+                            BEGIN
+                                INSERT INTO @ejemplares
+                                SELECT TOP (@cantidad_actual) id_ejemplar, canjear_codigo
+                                FROM Product.Ejemplar
+                                WHERE edicionproductid = @edicion_actual
+                                  AND estado = 'activo'
+                                  AND productid IS NULL
+                                ORDER BY id_ejemplar;
+                            END
+                            ELSE
+                            BEGIN
+                                INSERT INTO @ejemplares
+                                SELECT TOP (@cantidad_actual) id_ejemplar, canjear_codigo
+                                FROM Product.Ejemplar
+                                WHERE productid = @productoid_actual
+                                  AND estado = 'activo'
+                                  AND edicionproductid IS NULL
+                                ORDER BY id_ejemplar;
+                            END
+
+                            IF (SELECT COUNT(*) FROM @ejemplares) < @cantidad_actual
+                            BEGIN
+                                DECLARE @faltantes INT = @cantidad_actual - (SELECT COUNT(*) FROM @ejemplares);
+                                DECLARE @msg NVARCHAR(200) = 'No hay suficientes códigos disponibles para "' + @producto_actual + '". Faltan ' + CAST(@faltantes AS VARCHAR(10)) + ' unidades.';
+                                THROW 50000, @msg, 1;
+                            END
+
+                            -- Marcar ejemplares como 'comprado'
+                            UPDATE Product.Ejemplar
+                            SET estado = 'comprado'
+                            WHERE id_ejemplar IN (SELECT id FROM @ejemplares);
+
+                            -- Guardar códigos
+                            INSERT INTO @codigos (producto, codigo)
+                            SELECT @producto_actual, codigo FROM @ejemplares;
+
+                            SET @i = @i + 1;
+                        END
+
+                        -- 6. Marcar carrito como completado
+                        UPDATE Venta.Carrito
+                        SET estado = 'completado', fecha_cierre = CAST(GETDATE() AS DATE)
+                        WHERE carro_id = @carro_id;
+
+                        -- 7. Generar JSON manualmente
+                        SET @codigos_json = '[' +
+                            STUFF((SELECT ',' + '{"producto":"' + REPLACE(producto, '"', '\"') + '","codigo":"' + codigo + '"}'
+                                   FROM @codigos
+                                   FOR XML PATH('')), 1, 1, '') + ']';
+
+                        COMMIT TRANSACTION;
+                    END TRY
+                    BEGIN CATCH
+                        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+                        DECLARE @err_msg NVARCHAR(MAX) = ERROR_MESSAGE();
+                        THROW 50000, @err_msg, 1;
                     END CATCH
                 END;
             `);
@@ -388,6 +571,19 @@ async function run() {
                         (4, 'Transferencia Bancaria', 'activo'),
                         (5, 'Criptomoneda', 'activo');
                         SET IDENTITY_INSERT Metodo_Pago OFF;
+                    END
+
+                    -- Asegurar que existan proveedores para evitar conflictos de FK en movimientos de inventario
+                    IF NOT EXISTS (SELECT 1 FROM Provedor.Provedor)
+                    BEGIN
+                        SET IDENTITY_INSERT Provedor.Provedor ON;
+                        INSERT INTO Provedor.Provedor (provedorid, nombre) VALUES
+                        (1, 'GameDistrib SA'),
+                        (2, 'DigitalKeys Bolivia'),
+                        (3, 'SteamKeys Latam'),
+                        (4, 'PSN Distribuidor Oficial'),
+                        (5, 'Xbox Game Pass Proveedor');
+                        SET IDENTITY_INSERT Provedor.Provedor OFF;
                     END
 
                     -- Asegurar que existan desarrolladores para evitar conflictos de FK
@@ -490,6 +686,19 @@ async function run() {
                         (4, 'Transferencia Bancaria', 'activo'),
                         (5, 'Criptomoneda', 'activo');
                         SET IDENTITY_INSERT Metodo_Pago OFF;
+                    END
+
+                    -- Asegurar que existan proveedores para evitar conflictos de FK en movimientos de inventario
+                    IF NOT EXISTS (SELECT 1 FROM Provedor.Provedor)
+                    BEGIN
+                        SET IDENTITY_INSERT Provedor.Provedor ON;
+                        INSERT INTO Provedor.Provedor (provedorid, nombre) VALUES
+                        (1, 'GameDistrib SA'),
+                        (2, 'DigitalKeys Bolivia'),
+                        (3, 'SteamKeys Latam'),
+                        (4, 'PSN Distribuidor Oficial'),
+                        (5, 'Xbox Game Pass Proveedor');
+                        SET IDENTITY_INSERT Provedor.Provedor OFF;
                     END
 
                     -- Asegurar que existan desarrolladores para evitar conflictos de FK

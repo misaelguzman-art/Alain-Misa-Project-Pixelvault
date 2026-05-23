@@ -528,7 +528,7 @@ router.get('/inventario/lista', async (req, res) => {
 
 // 1. Crear producto
 router.post('/admin/productos', async (req, res) => {
-    const { name, developerid, tipo_juego, juego_base, precio_base, fecha_de_lanzamiento, paisid } = req.body;
+    const { name, developerid, tipo_juego, juego_base, precio_base, fecha_de_lanzamiento, paisid, stock_inicial } = req.body;
     try {
         const pool = req.dbPool;
         await pool.request()
@@ -539,6 +539,7 @@ router.post('/admin/productos', async (req, res) => {
             .input('precio_base', sql.Decimal(10, 2), precio_base || null)
             .input('fecha_de_lanzamiento', sql.Date, fecha_de_lanzamiento || null)
             .input('paisid', sql.Int, paisid || null)
+            .input('stock_inicial', sql.Int, stock_inicial || 0)
             .execute('dbo.CrearProductoAdmin');
         res.status(201).json({ mensaje: "Producto creado con éxito." });
     } catch (err) {

@@ -856,6 +856,7 @@ class App {
         let precio_base = document.getElementById('crud-prod-precio').value;
         let fecha = document.getElementById('crud-prod-fecha').value;
         let paisid = document.getElementById('crud-prod-pais').value;
+        let stock_inicial = document.getElementById('crud-prod-stock').value;
 
         if (!name || !developerid) return this.toast('Introduce nombre y desarrollador', 'error');
 
@@ -867,13 +868,15 @@ class App {
                 juego_base: juego_base ? parseInt(juego_base) : null,
                 precio_base: precio_base ? parseFloat(precio_base) : null,
                 fecha_de_lanzamiento: fecha || null,
-                paisid: paisid ? parseInt(paisid) : null
+                paisid: paisid ? parseInt(paisid) : null,
+                stock_inicial: stock_inicial ? parseInt(stock_inicial) : 0
             });
             this.toast('Producto creado con éxito');
             document.getElementById('crud-prod-name').value = '';
             document.getElementById('crud-prod-precio').value = '';
             document.getElementById('crud-prod-fecha').value = '';
             document.getElementById('crud-prod-pais').value = '';
+            document.getElementById('crud-prod-stock').value = '0';
             await this.prepopuladoCrudAdmin();
             await this.cargarListadosRapidosAdmin();
         } catch (err) {
