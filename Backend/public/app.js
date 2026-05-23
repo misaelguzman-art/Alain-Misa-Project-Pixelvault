@@ -666,10 +666,9 @@ class App {
             let colorTag = item.tipo_juego === 'juego' ? 'tag-juego' : (item.tipo_juego === 'dlc' ? 'tag-dlc' : 'tag-comp');
             let isLowStock = item.cantidad < 10;
             let stockStyle = isLowStock ? 'color: var(--amarillo); font-weight: bold;' : '';
-            let nodoLabel = item.nodo ? `<span style="font-size:0.75rem; font-weight:bold; color:var(--texto-sec)">[${item.nodo.toUpperCase()}]</span>` : '';
             return `
                 <tr>
-                    <td>#${item.inventoryid} ${nodoLabel}</td>
+                    <td>#${item.inventoryid}</td>
                     <td style="font-weight: 500">${item.nombre_producto}</td>
                     <td><span class="tag ${colorTag}">${item.tipo_juego}</span></td>
                     <td>${item.nombre_edicion || '<span style="color:var(--texto-sec)">Contenido Digital</span>'}</td>
@@ -694,16 +693,11 @@ class App {
         let cantidad = parseInt(input.value);
         if (isNaN(cantidad) || cantidad < 0) return this.toast('La cantidad debe ser mayor o igual a 0', 'error');
 
-        // Obtener el nodo correspondiente al elemento seleccionado de la copia local
-        let item = rol === 'vendedor' ? this.inventarioVendedor[index] : this.inventarioAdmin[index];
-        let nodo = item ? item.nodo : null;
-
         try {
             await this.api.put('/inventario/stock', {
                 productid: pid || null,
                 edicionproductid: epid || null,
-                cantidad: cantidad,
-                nodo: nodo
+                cantidad: cantidad
             });
             this.toast('Stock actualizado con éxito');
             if (isVendedor) {
