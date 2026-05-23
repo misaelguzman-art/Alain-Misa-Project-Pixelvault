@@ -82,6 +82,13 @@ async function run() {
             // ============================================================
             console.log('🧹 Limpiando todo el catálogo de juegos anterior y datos dinámicos...');
             await request.query(`
+                -- 3.1 Limpiar transacciones para evitar conflictos de llave foránea
+                DELETE FROM Venta.PedidoDetalles;
+                DELETE FROM Venta.Pedido;
+                DELETE FROM Venta.CarroDetalles;
+                DELETE FROM Venta.Carrito;
+
+                -- 3.2 Limpiar catálogo de productos
                 DELETE FROM Product.MovimientoInventario;
                 DELETE FROM Product.Inventario;
                 DELETE FROM Product.Ejemplar;
@@ -95,6 +102,12 @@ async function run() {
                 DBCC CHECKIDENT ('Product.EdicionProduct', RESEED, 0);
                 DBCC CHECKIDENT ('Product.Ejemplar', RESEED, 0);
                 DBCC CHECKIDENT ('Product.Inventario', RESEED, 0);
+                
+                IF OBJECT_ID('dbo.Auditoria', 'U') IS NOT NULL
+                BEGIN
+                    DELETE FROM dbo.Auditoria;
+                    DBCC CHECKIDENT ('dbo.Auditoria', RESEED, 0);
+                END
             `);
 
             // ============================================================
@@ -362,7 +375,12 @@ async function run() {
             process.exit(0);
 
         } catch (innerErr) {
-            await transaction.rollback();
+            console.error('❌ Error interno detectado en la base de datos:', innerErr);
+            try {
+                await transaction.rollback();
+            } catch (rollbackErr) {
+                // Silenciar error de rollback si la transacción ya fue abortada por SQL Server
+            }
             throw innerErr;
         }
 
