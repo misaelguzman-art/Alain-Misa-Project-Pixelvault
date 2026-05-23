@@ -367,13 +367,58 @@ async function run() {
                     END
                     SELECT TOP 1 @devid = developerid FROM Product.Developer;
 
-                    -- 1. Juego Global
+                    -- 1. Juego Global (Elden Ring)
                     INSERT INTO Product.Product (name, developerid, estado, tipo_juego, juego_base, precio_base, fecha_de_lanzamiento, paisid)
                     VALUES ('Elden Ring (Global)', @devid, 'activo', 'juego', NULL, 59.99, '2022-02-25', NULL);
+                    DECLARE @elden_ring_id INT = SCOPE_IDENTITY();
 
-                    -- 2. Juego exclusivo de Bolivia
+                    -- Encontrar o insertar la edición estándar
+                    DECLARE @estandar_id INT;
+                    SELECT TOP 1 @estandar_id = edicionid FROM Product.Edicion WHERE name LIKE '%estandar%' OR name LIKE '%Estandar%' OR name LIKE '%Standard%';
+                    IF @estandar_id IS NULL
+                    BEGIN
+                        INSERT INTO Product.Edicion (name) VALUES ('Estandar');
+                        SET @estandar_id = SCOPE_IDENTITY();
+                    END
+
+                    -- Encontrar o insertar la edición Deluxe
+                    DECLARE @deluxe_id INT;
+                    SELECT TOP 1 @deluxe_id = edicionid FROM Product.Edicion WHERE name LIKE '%Deluxe%' OR name LIKE '%deluxe%';
+                    IF @deluxe_id IS NULL
+                    BEGIN
+                        INSERT INTO Product.Edicion (name) VALUES ('Deluxe');
+                        SET @deluxe_id = SCOPE_IDENTITY();
+                    END
+
+                    -- Insertar Edición Estándar para Elden Ring
+                    INSERT INTO Product.EdicionProduct (productid, edicionid, precio, fecha_lanzamiento)
+                    VALUES (@elden_ring_id, @estandar_id, 59.99, '2022-02-25');
+                    DECLARE @elden_estandar_ep INT = SCOPE_IDENTITY();
+
+                    -- Insertar Edición Deluxe para Elden Ring
+                    INSERT INTO Product.EdicionProduct (productid, edicionid, precio, fecha_lanzamiento)
+                    VALUES (@elden_ring_id, @deluxe_id, 79.99, '2022-02-25');
+                    DECLARE @elden_deluxe_ep INT = SCOPE_IDENTITY();
+
+                    -- Insertar Stock de Elden Ring en Inventario
+                    INSERT INTO Product.Inventario (productid, edicionproductid, cantidad) VALUES
+                    (NULL, @elden_estandar_ep, 50),
+                    (NULL, @elden_deluxe_ep, 30);
+
+
+                    -- 2. Juego exclusivo de Bolivia (Zelda)
                     INSERT INTO Product.Product (name, developerid, estado, tipo_juego, juego_base, precio_base, fecha_de_lanzamiento, paisid)
                     VALUES ('Zelda Tears of the Kingdom (Bolivia)', @devid, 'activo', 'juego', NULL, 69.99, '2023-05-12', 1);
+                    DECLARE @zelda_id INT = SCOPE_IDENTITY();
+
+                    -- Insertar Edición Estándar para Zelda
+                    INSERT INTO Product.EdicionProduct (productid, edicionid, precio, fecha_lanzamiento)
+                    VALUES (@zelda_id, @estandar_id, 69.99, '2023-05-12');
+                    DECLARE @zelda_estandar_ep INT = SCOPE_IDENTITY();
+
+                    -- Insertar Stock de Zelda en Inventario
+                    INSERT INTO Product.Inventario (productid, edicionproductid, cantidad) VALUES
+                    (NULL, @zelda_estandar_ep, 40);
                 `);
             } else if (targetNode === 'peru') {
                 // La sucursal de Perú inserta juegos de Perú y admin de Perú
@@ -407,9 +452,28 @@ async function run() {
                     END
                     SELECT TOP 1 @devid = developerid FROM Product.Developer;
 
-                    -- 3. Juego exclusivo de Perú
+                    -- 3. Juego exclusivo de Perú (F1 2024)
                     INSERT INTO Product.Product (name, developerid, estado, tipo_juego, juego_base, precio_base, fecha_de_lanzamiento, paisid)
                     VALUES ('F1 2024 (Peru Edition)', @devid, 'activo', 'juego', NULL, 49.99, '2024-05-31', 4);
+                    DECLARE @f1_id INT = SCOPE_IDENTITY();
+
+                    -- Encontrar o insertar la edición estándar
+                    DECLARE @estandar_id INT;
+                    SELECT TOP 1 @estandar_id = edicionid FROM Product.Edicion WHERE name LIKE '%estandar%' OR name LIKE '%Estandar%' OR name LIKE '%Standard%';
+                    IF @estandar_id IS NULL
+                    BEGIN
+                        INSERT INTO Product.Edicion (name) VALUES ('Estandar');
+                        SET @estandar_id = SCOPE_IDENTITY();
+                    END
+
+                    -- Insertar Edición Estándar para F1 2024
+                    INSERT INTO Product.EdicionProduct (productid, edicionid, precio, fecha_lanzamiento)
+                    VALUES (@f1_id, @estandar_id, 49.99, '2024-05-31');
+                    DECLARE @f1_estandar_ep INT = SCOPE_IDENTITY();
+
+                    -- Insertar Stock de F1 2024 en Inventario
+                    INSERT INTO Product.Inventario (productid, edicionproductid, cantidad) VALUES
+                    (NULL, @f1_estandar_ep, 15);
                 `);
             }
 
