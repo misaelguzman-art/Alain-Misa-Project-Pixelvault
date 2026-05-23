@@ -346,6 +346,19 @@ async function run() {
                     ('Administrador Bolivia', NULL, 'Sistema', 'admin@gmail.com', 'activo', '591-00000000', 1, 'admin', 'admin'),
                     ('Vendedor Bolivia', NULL, 'Tienda', 'vendedor@gmail.com', 'activo', '591-11111111', 1, 'vendedor', 'vendedor');
 
+                    -- Asegurar que existan métodos de pago para evitar conflictos de FK
+                    IF NOT EXISTS (SELECT 1 FROM Metodo_Pago)
+                    BEGIN
+                        SET IDENTITY_INSERT Metodo_Pago ON;
+                        INSERT INTO Metodo_Pago (id_metodo, nombre, estado) VALUES
+                        (1, 'Tarjeta de Credito', 'activo'),
+                        (2, 'Tarjeta de Debito', 'activo'),
+                        (3, 'PayPal', 'activo'),
+                        (4, 'Transferencia Bancaria', 'activo'),
+                        (5, 'Criptomoneda', 'activo');
+                        SET IDENTITY_INSERT Metodo_Pago OFF;
+                    END
+
                     -- Asegurar que existan desarrolladores para evitar conflictos de FK
                     DECLARE @devid INT;
                     IF NOT EXISTS (SELECT 1 FROM Product.Developer)
@@ -372,6 +385,19 @@ async function run() {
                     VALUES 
                     ('Administrador Perú', NULL, 'Sistema', 'admin@gmail.com', 'activo', '591-00000000', 4, 'admin', 'admin'),
                     ('Vendedor Perú', NULL, 'Tienda', 'vendedor@gmail.com', 'activo', '591-11111111', 4, 'vendedor', 'vendedor');
+
+                    -- Asegurar que existan métodos de pago para evitar conflictos de FK
+                    IF NOT EXISTS (SELECT 1 FROM Metodo_Pago)
+                    BEGIN
+                        SET IDENTITY_INSERT Metodo_Pago ON;
+                        INSERT INTO Metodo_Pago (id_metodo, nombre, estado) VALUES
+                        (1, 'Tarjeta de Credito', 'activo'),
+                        (2, 'Tarjeta de Debito', 'activo'),
+                        (3, 'PayPal', 'activo'),
+                        (4, 'Transferencia Bancaria', 'activo'),
+                        (5, 'Criptomoneda', 'activo');
+                        SET IDENTITY_INSERT Metodo_Pago OFF;
+                    END
 
                     -- Asegurar que existan desarrolladores para evitar conflictos de FK
                     DECLARE @devid INT;
