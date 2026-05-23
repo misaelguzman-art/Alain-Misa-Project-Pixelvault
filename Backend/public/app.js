@@ -4,8 +4,12 @@ class API {
         this.baseURL = baseURL;
     }
     async request(endpoint, options = {}) {
+        const sucursal = localStorage.getItem('sucursal') || 'bolivia';
         const res = await fetch(this.baseURL + endpoint, {
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'x-pais': sucursal
+            },
             ...options
         });
         const data = await res.json();
@@ -56,6 +60,14 @@ class App {
         this.bindGlobalFunctions();
         this.mostrarRegistro();
         this.setupEventDelegation();
+
+        // Sincronizar el select de sucursal con el valor guardado
+        setTimeout(() => {
+            const select = document.getElementById('select-sucursal');
+            if (select) {
+                select.value = localStorage.getItem('sucursal') || 'bolivia';
+            }
+        }, 100);
     }
 
     bindGlobalFunctions() {
@@ -64,6 +76,7 @@ class App {
         window.mostrarRegistro = () => this.mostrarRegistro();
         window.mostrarLogin = () => this.mostrarLogin();
         window.cerrarSesion = () => this.cerrarSesion();
+        window.cambiarSucursal = (val) => this.cambiarSucursal(val);
         window.cambiarPestana = (p, btn) => this.cambiarPestana(p, btn);
         window.mostrarModalAgregarPago = () => this.mostrarModal('modal-agregar-pago');
         window.cerrarModalAgregarPago = () => this.cerrarModal('modal-agregar-pago');
@@ -223,10 +236,18 @@ class App {
                 let tipo = j.tipo_dejuego || 'juego';
                 let tagClass = tipo === 'juego' ? 'tag-juego' : (tipo === 'dlc' ? 'tag-dlc' : 'tag-comp');
                 let color = colores[idx % colores.length];
+                let paisBadgeColor = j.pais_ambito === 'Peru' ? 'rgba(239, 68, 68, 0.2); color: #f87171;' : (j.pais_ambito === 'Bolivia' ? 'rgba(245, 158, 11, 0.2); color: #fbbf24;' : 'rgba(16, 185, 129, 0.2); color: #34d399;');
                 return `
                     <div class="card" data-idx="${idx}" data-productid="${j.productid}" data-nombre="${j.nombre_juego.replace(/'/g, "\\'")}" data-tipo="${tipo}">
                         <div class="card-header" style="background:linear-gradient(135deg,${color},${color}88)"><span style="font-size:2.5rem">${emojis[tipo] || '🎮'}</span></div>
-                        <div class="card-body"><h5>${j.nombre_juego}</h5><span class="tag ${tagClass}">${tipo}</span>${j.Cabeza ? `<div class="ed-stock mt-1">de ${j.Cabeza}</div>` : ''}</div>
+                        <div class="card-body">
+                            <h5>${j.nombre_juego}</h5>
+                            <div class="flex gap-1 mb-1">
+                                <span class="tag ${tagClass}">${tipo}</span>
+                                <span class="tag" style="background: ${paisBadgeColor} font-weight: 700; border: 1px solid var(--borde);">${j.pais_ambito || 'Global'}</span>
+                            </div>
+                            ${j.Cabeza ? `<div class="ed-stock mt-1">de ${j.Cabeza}</div>` : ''}
+                        </div>
                         <div class="card-footer">
                             <div class="ed-price">Ver ediciones →</div>
                             <button class="btn btn-primario w-full mt-1 btn-agregar">+ Agregar</button>
@@ -915,6 +936,14 @@ class App {
             this.toast('Estado de la edición actualizado');
             await this.cargarListadosRapidosAdmin();
         } catch (err) { this.toast('Error: ' + err.message, 'error'); }
+    }
+
+    cambiarSucursal(val) {
+        localStorage.setItem('sucursal', val);
+        this.toast(`Cambiando a sucursal: ${val.toUpperCase()}`, 'success');
+        setTimeout(() => {
+            location.reload();
+        }, 800);
     }
 }
 

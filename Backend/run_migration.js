@@ -238,7 +238,7 @@ async function run() {
                     DECLARE @PaisLocalID INT = NULL;
                     SELECT TOP 1 @PaisLocalID = pais_local_id FROM dbo.ConfiguracionLocal;
 
-                    IF @PaisLocalID = 4 AND @paisid <> 4
+                    IF @PaisLocalID IS NOT NULL AND @paisid <> @PaisLocalID
                     BEGIN
                         THROW 51000, 'el pais no esta disponible para nuestro servicios por ahora', 1;
                         RETURN;
@@ -331,13 +331,21 @@ async function run() {
             }
 
             // ============================================================
-            // 7. INSERTAR JUEGOS DE PRUEBA NUEVOS (CENTRAL O LOCAL SEGÚN EL CASO)
+            // 7. INSERTAR JUEGOS DE PRUEBA NUEVOS Y USUARIOS ADMINISTRATIVOS LOCALES
             // ============================================================
-            console.log('🆕 Insertando juegos de prueba nuevos con sus ámbitos de país...');
+            console.log('🆕 Insertando cuentas administrativas y juegos de prueba con sus ámbitos de país...');
             
             if (targetNode === 'bolivia') {
-                // La central inserta juegos Globales y juegos específicos de Bolivia
+                // La central inserta juegos Globales y juegos específicos de Bolivia, y admin de Bolivia
                 await request.query(`
+                    -- Asegurar cuentas de sistema de Bolivia (ID 1)
+                    DELETE FROM Cliente.Cliente WHERE email IN ('admin@gmail.com', 'vendedor@gmail.com');
+                    
+                    INSERT INTO Cliente.Cliente (nombre, nmedio, apellido, email, estado, numero_contacto, paisid, rol, contrasena)
+                    VALUES 
+                    ('Administrador Bolivia', NULL, 'Sistema', 'admin@gmail.com', 'activo', '591-00000000', 1, 'admin', 'admin'),
+                    ('Vendedor Bolivia', NULL, 'Tienda', 'vendedor@gmail.com', 'activo', '591-11111111', 1, 'vendedor', 'vendedor');
+
                     -- Asegurar que existan desarrolladores para evitar conflictos de FK
                     DECLARE @devid INT;
                     IF NOT EXISTS (SELECT 1 FROM Product.Developer)
@@ -355,8 +363,16 @@ async function run() {
                     VALUES ('Zelda Tears of the Kingdom (Bolivia)', @devid, 'activo', 'juego', NULL, 69.99, '2023-05-12', 1);
                 `);
             } else if (targetNode === 'peru') {
-                // La sucursal de Perú inserta únicamente juegos de Perú
+                // La sucursal de Perú inserta juegos de Perú y admin de Perú
                 await request.query(`
+                    -- Asegurar cuentas de sistema de Perú (ID 4)
+                    DELETE FROM Cliente.Cliente WHERE email IN ('admin@gmail.com', 'vendedor@gmail.com');
+                    
+                    INSERT INTO Cliente.Cliente (nombre, nmedio, apellido, email, estado, numero_contacto, paisid, rol, contrasena)
+                    VALUES 
+                    ('Administrador Perú', NULL, 'Sistema', 'admin@gmail.com', 'activo', '591-00000000', 4, 'admin', 'admin'),
+                    ('Vendedor Perú', NULL, 'Tienda', 'vendedor@gmail.com', 'activo', '591-11111111', 4, 'vendedor', 'vendedor');
+
                     -- Asegurar que existan desarrolladores para evitar conflictos de FK
                     DECLARE @devid INT;
                     IF NOT EXISTS (SELECT 1 FROM Product.Developer)

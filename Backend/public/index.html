@@ -352,8 +352,18 @@
 <body>
 
     <nav class="navbar">
-        <div class="nav-brand" onclick="if(usuarioActual) mostrarSeccion(usuarioActual.rol === 'admin' ? 'admin' : 'cliente')">PIXEL<span>VAULT</span></div>
-        <div class="flex gap-1" id="nav-links"></div>
+        <div class="nav-brand" onclick="if(window.app && window.app.usuario) mostrarSeccion(window.app.usuario.rol === 'admin' ? 'admin' : 'cliente')">PIXELVAULT</div>
+        <div class="flex center gap-2" style="display: flex; align-items: center; gap: 1rem;">
+            <!-- Selector de Sucursal Dinámico -->
+            <div class="flex center gap-1" style="display: flex; align-items: center; gap: 0.5rem; background: var(--surface2); border: 1px solid var(--borde); padding: 4px 12px; border-radius: var(--radio);">
+                <span class="label" style="margin-bottom:0; font-size: 0.7rem; font-weight: 700; color: var(--acento2); text-transform: uppercase;">Sucursal:</span>
+                <select id="select-sucursal" class="select" style="padding: 4px 8px; width: auto; font-size: 0.8rem; background: transparent; border: none; outline: none; cursor: pointer; color: var(--texto);" onchange="window.cambiarSucursal(this.value)">
+                    <option value="bolivia" style="background: var(--surface); color: var(--texto);">Bolivia (Central)</option>
+                    <option value="peru" style="background: var(--surface); color: var(--texto);">Perú (Sucursal)</option>
+                </select>
+            </div>
+            <div class="flex gap-1" id="nav-links"></div>
+        </div>
     </nav>
     <div id="toast"></div>
 
