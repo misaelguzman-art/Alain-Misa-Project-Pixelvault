@@ -379,8 +379,30 @@ router.get('/paises', async (req, res) => {
 router.get('/reportes/directorio-clientes', async (req, res) => {
     try {
         const pool = req.dbPool;
-        const result = await pool.request().query('SELECT * FROM VW_Directorio_clientes');
-        res.json(result.recordset);
+        const pais = req.headers['x-pais'] || req.query.pais || 'bolivia';
+        
+        let list = [];
+        
+        // 1. Obtener clientes locales
+        const resultLocal = await pool.request().query('SELECT * FROM VW_Directorio_clientes');
+        list.push(...resultLocal.recordset);
+        
+        // 2. Si estamos en Bolivia (Central), también intentamos cargar los clientes de Perú (Sucursal)
+        if (pais.toLowerCase() === 'bolivia') {
+            try {
+                const { poolPeru } = require('./database');
+                if (!poolPeru.connected) {
+                    await poolPeru.connect();
+                }
+                const resultPeru = await poolPeru.request().query('SELECT * FROM VW_Directorio_clientes');
+                list.push(...resultPeru.recordset);
+            } catch (peruErr) {
+                console.log('⚠️ No se pudo conectar al nodo de Perú para obtener sus clientes (Sucursal offline):', peruErr.message);
+                // No arrojamos error para que Bolivia cargue sus clientes locales sin fallar
+            }
+        }
+        
+        res.json(list);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
