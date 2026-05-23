@@ -762,4 +762,19 @@ router.post('/pedidos/asignar-metodo-pago', async (req, res) => {
     }
 });
 
+// Crear Desarrollador (Developer) desde el panel de administración
+router.post('/admin/developers', async (req, res) => {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'Nombre del desarrollador requerido' });
+    try {
+        const pool = req.dbPool;
+        await pool.request()
+            .input('name', sql.VarChar(50), name)
+            .query('INSERT INTO Product.Developer (name) VALUES (@name)');
+        res.status(201).json({ mensaje: "Desarrollador creado con éxito." });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;

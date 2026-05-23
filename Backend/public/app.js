@@ -100,6 +100,7 @@ class App {
         window.entregarPedido = (pedidoId) => this.entregarPedido(pedidoId);
         window.toggleJuegoBaseSelector = () => this.toggleJuegoBaseSelector();
         window.crearProductoAdmin = () => this.crearProductoAdmin();
+        window.crearDeveloperAdmin = () => this.crearDeveloperAdmin();
         window.unirProductoEdicionAdmin = () => this.unirProductoEdicionAdmin();
         window.crearMetodoPagoAdmin = () => this.crearMetodoPagoAdmin();
         window.crearPromocionAdmin = () => this.crearPromocionAdmin();
@@ -801,6 +802,7 @@ class App {
         let juego_base = document.getElementById('crud-prod-base').value;
         let precio_base = document.getElementById('crud-prod-precio').value;
         let fecha = document.getElementById('crud-prod-fecha').value;
+        let paisid = document.getElementById('crud-prod-pais').value;
 
         if (!name || !developerid) return this.toast('Introduce nombre y desarrollador', 'error');
 
@@ -811,12 +813,14 @@ class App {
                 tipo_juego,
                 juego_base: juego_base ? parseInt(juego_base) : null,
                 precio_base: precio_base ? parseFloat(precio_base) : null,
-                fecha_de_lanzamiento: fecha || null
+                fecha_de_lanzamiento: fecha || null,
+                paisid: paisid ? parseInt(paisid) : null
             });
             this.toast('Producto creado con éxito');
             document.getElementById('crud-prod-name').value = '';
             document.getElementById('crud-prod-precio').value = '';
             document.getElementById('crud-prod-fecha').value = '';
+            document.getElementById('crud-prod-pais').value = '';
             await this.prepopuladoCrudAdmin();
             await this.cargarListadosRapidosAdmin();
         } catch (err) {
@@ -845,6 +849,19 @@ class App {
             await this.cargarListadosRapidosAdmin();
         } catch (err) {
             this.toast('Error al vincular: ' + err.message, 'error');
+        }
+    }
+
+    async crearDeveloperAdmin() {
+        let name = document.getElementById('crud-dev-nombre').value.trim();
+        if (!name) return this.toast('Introduce el nombre del desarrollador', 'error');
+        try {
+            await this.api.post('/admin/developers', { name });
+            this.toast('Desarrollador creado con éxito');
+            document.getElementById('crud-dev-nombre').value = '';
+            await this.prepopuladoCrudAdmin();
+        } catch (err) {
+            this.toast('Error al crear: ' + err.message, 'error');
         }
     }
 

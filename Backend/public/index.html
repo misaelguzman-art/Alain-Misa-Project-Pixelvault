@@ -611,6 +611,14 @@
                                     <label class="label">Fecha de Lanzamiento</label>
                                     <input type="date" id="crud-prod-fecha" class="input w-full">
                                 </div>
+                                <div>
+                                    <label class="label">Ámbito de País (País) *</label>
+                                    <select id="crud-prod-pais" class="select w-full">
+                                        <option value="">Global (Todos los países)</option>
+                                        <option value="1">Bolivia</option>
+                                        <option value="4">Perú</option>
+                                    </select>
+                                </div>
                                 <button class="btn btn-primario btn-full mt-1" onclick="crearProductoAdmin()">Crear Producto →</button>
                             </div>
                         </div>
@@ -647,6 +655,17 @@
                             <div class="panel-header"><h4>📋 Listado de Productos</h4></div>
                             <div class="panel-body" style="max-height: 250px; overflow-y: auto;" id="crud-lista-productos">
                                 <div class="text-center">Cargando productos...</div>
+                            </div>
+                        </div>
+
+                        <!-- Desarrolladores (Developers) -->
+                        <div class="panel">
+                            <div class="panel-header"><h4>🏢 Desarrolladores del Sistema</h4></div>
+                            <div class="panel-body col flex gap-1">
+                                <div class="flex gap-1">
+                                    <input type="text" id="crud-dev-nombre" class="input w-full" placeholder="Nombre (ej: EA Games)">
+                                    <button class="btn btn-primario" onclick="crearDeveloperAdmin()">Crear</button>
+                                </div>
                             </div>
                         </div>
 
