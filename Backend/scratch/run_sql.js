@@ -35,8 +35,12 @@ async function run() {
     console.log('✅ Connected successfully.');
 
     for (let i = 0; i < batches.length; i++) {
-        const batch = batches[i].trim();
-        if (!batch) continue;
+        // Strip any "USE [DatabaseName];" statements dynamically to keep execution in the current connection context
+        let batch = batches[i].replace(/^\s*USE\s+\[?\w+\]?;?\s*$/gmi, '').trim();
+        if (!batch) {
+            console.log(`Skipping batch ${i + 1} (empty after filtering USE statement)`);
+            continue;
+        }
 
         console.log(`\nExecuting batch ${i + 1}/${batches.length}...`);
         const firstLine = batch.split('\n')[0].substring(0, 80);
