@@ -338,20 +338,36 @@ async function run() {
             if (targetNode === 'bolivia') {
                 // La central inserta juegos Globales y juegos específicos de Bolivia
                 await request.query(`
+                    -- Asegurar que existan desarrolladores para evitar conflictos de FK
+                    DECLARE @devid INT;
+                    IF NOT EXISTS (SELECT 1 FROM Product.Developer)
+                    BEGIN
+                        INSERT INTO Product.Developer (name) VALUES ('FromSoftware'), ('Nintendo');
+                    END
+                    SELECT TOP 1 @devid = developerid FROM Product.Developer;
+
                     -- 1. Juego Global
                     INSERT INTO Product.Product (name, developerid, estado, tipo_juego, juego_base, precio_base, fecha_de_lanzamiento, paisid)
-                    VALUES ('Elden Ring (Global)', 1, 'activo', 'juego', NULL, 59.99, '2022-02-25', NULL);
+                    VALUES ('Elden Ring (Global)', @devid, 'activo', 'juego', NULL, 59.99, '2022-02-25', NULL);
 
                     -- 2. Juego exclusivo de Bolivia
                     INSERT INTO Product.Product (name, developerid, estado, tipo_juego, juego_base, precio_base, fecha_de_lanzamiento, paisid)
-                    VALUES ('Zelda Tears of the Kingdom (Bolivia)', 5, 'activo', 'juego', NULL, 69.99, '2023-05-12', 1);
+                    VALUES ('Zelda Tears of the Kingdom (Bolivia)', @devid, 'activo', 'juego', NULL, 69.99, '2023-05-12', 1);
                 `);
             } else if (targetNode === 'peru') {
                 // La sucursal de Perú inserta únicamente juegos de Perú
                 await request.query(`
+                    -- Asegurar que existan desarrolladores para evitar conflictos de FK
+                    DECLARE @devid INT;
+                    IF NOT EXISTS (SELECT 1 FROM Product.Developer)
+                    BEGIN
+                        INSERT INTO Product.Developer (name) VALUES ('Codemasters');
+                    END
+                    SELECT TOP 1 @devid = developerid FROM Product.Developer;
+
                     -- 3. Juego exclusivo de Perú
                     INSERT INTO Product.Product (name, developerid, estado, tipo_juego, juego_base, precio_base, fecha_de_lanzamiento, paisid)
-                    VALUES ('F1 2024 (Peru Edition)', 4, 'activo', 'juego', NULL, 49.99, '2024-05-31', 4);
+                    VALUES ('F1 2024 (Peru Edition)', @devid, 'activo', 'juego', NULL, 49.99, '2024-05-31', 4);
                 `);
             }
 
