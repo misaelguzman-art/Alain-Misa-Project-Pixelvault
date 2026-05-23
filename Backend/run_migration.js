@@ -258,7 +258,7 @@ async function run() {
             `);
 
             await request.query(`
-                -- SP CrearProductoAdmin con validación de ámbito geográfico
+                -- SP CrearProductoAdmin con validación de ámbito geográfico e inicialización automática de stock
                 CREATE OR ALTER PROCEDURE dbo.CrearProductoAdmin
                     @name VARCHAR(50),
                     @developerid INT,
@@ -283,6 +283,37 @@ async function run() {
                         BEGIN TRANSACTION;
                             INSERT INTO Product.Product (name, developerid, estado, tipo_juego, juego_base, precio_base, fecha_de_lanzamiento, paisid)
                             VALUES (@name, @developerid, 'activo', @tipo_juego, @juego_base, @precio_base, @fecha_de_lanzamiento, @paisid);
+                            
+                            DECLARE @new_product_id INT = SCOPE_IDENTITY();
+
+                            IF @tipo_juego = 'juego'
+                            BEGIN
+                                -- Encontrar o insertar la edición estándar
+                                DECLARE @estandar_id INT;
+                                SELECT TOP 1 @estandar_id = edicionid FROM Product.Edicion WHERE name LIKE '%estandar%' OR name LIKE '%Estandar%' OR name LIKE '%Standard%';
+                                IF @estandar_id IS NULL
+                                BEGIN
+                                    INSERT INTO Product.Edicion (name) VALUES ('Estandar');
+                                    SET @estandar_id = SCOPE_IDENTITY();
+                                END
+
+                                -- Vincular a la edición estándar
+                                INSERT INTO Product.EdicionProduct (productid, edicionid, precio, fecha_lanzamiento)
+                                VALUES (@new_product_id, @estandar_id, ISNULL(@precio_base, 0), ISNULL(@fecha_de_lanzamiento, GETDATE()));
+                                
+                                DECLARE @new_ep_id INT = SCOPE_IDENTITY();
+
+                                -- Inicializar inventario en 0
+                                INSERT INTO Product.Inventario (productid, edicionproductid, cantidad)
+                                VALUES (NULL, @new_ep_id, 0);
+                            END
+                            ELSE
+                            BEGIN
+                                -- Para DLC o Complemento, inicializar directamente a nivel de producto
+                                INSERT INTO Product.Inventario (productid, edicionproductid, cantidad)
+                                VALUES (@new_product_id, NULL, 0);
+                            END
+
                         COMMIT TRANSACTION;
                     END TRY
                     BEGIN CATCH
@@ -404,8 +435,19 @@ async function run() {
                     INSERT INTO Product.Inventario (productid, edicionproductid, cantidad) VALUES
                     (NULL, @elden_estandar_ep, 50),
                     (NULL, @elden_deluxe_ep, 30);
-
-
+ 
+                    -- Insertar Ejemplares (CD keys) activos de prueba para Elden Ring
+                    INSERT INTO Product.Ejemplar (productid, edicionproductid, canjear_codigo, estado) VALUES
+                    (NULL, @elden_estandar_ep, 'ER-EST-00001', 'activo'),
+                    (NULL, @elden_estandar_ep, 'ER-EST-00002', 'activo'),
+                    (NULL, @elden_estandar_ep, 'ER-EST-00003', 'activo'),
+                    (NULL, @elden_estandar_ep, 'ER-EST-00004', 'activo'),
+                    (NULL, @elden_estandar_ep, 'ER-EST-00005', 'activo'),
+                    (NULL, @elden_deluxe_ep, 'ER-DLX-00001', 'activo'),
+                    (NULL, @elden_deluxe_ep, 'ER-DLX-00002', 'activo'),
+                    (NULL, @elden_deluxe_ep, 'ER-DLX-00003', 'activo');
+ 
+ 
                     -- 2. Juego exclusivo de Bolivia (Zelda)
                     INSERT INTO Product.Product (name, developerid, estado, tipo_juego, juego_base, precio_base, fecha_de_lanzamiento, paisid)
                     VALUES ('Zelda Tears of the Kingdom (Bolivia)', @devid, 'activo', 'juego', NULL, 69.99, '2023-05-12', 1);
@@ -419,6 +461,12 @@ async function run() {
                     -- Insertar Stock de Zelda en Inventario
                     INSERT INTO Product.Inventario (productid, edicionproductid, cantidad) VALUES
                     (NULL, @zelda_estandar_ep, 40);
+
+                    -- Insertar Ejemplares (CD keys) activos de prueba para Zelda
+                    INSERT INTO Product.Ejemplar (productid, edicionproductid, canjear_codigo, estado) VALUES
+                    (NULL, @zelda_estandar_ep, 'ZEL-EST-00001', 'activo'),
+                    (NULL, @zelda_estandar_ep, 'ZEL-EST-00002', 'activo'),
+                    (NULL, @zelda_estandar_ep, 'ZEL-EST-00003', 'activo');
                 `);
             } else if (targetNode === 'peru') {
                 // La sucursal de Perú inserta juegos de Perú y admin de Perú
@@ -474,6 +522,12 @@ async function run() {
                     -- Insertar Stock de F1 2024 en Inventario
                     INSERT INTO Product.Inventario (productid, edicionproductid, cantidad) VALUES
                     (NULL, @f1_estandar_ep, 15);
+
+                    -- Insertar Ejemplares (CD keys) activos de prueba para F1 2024
+                    INSERT INTO Product.Ejemplar (productid, edicionproductid, canjear_codigo, estado) VALUES
+                    (NULL, @f1_estandar_ep, 'F1-EST-00001', 'activo'),
+                    (NULL, @f1_estandar_ep, 'F1-EST-00002', 'activo'),
+                    (NULL, @f1_estandar_ep, 'F1-EST-00003', 'activo');
                 `);
             }
 

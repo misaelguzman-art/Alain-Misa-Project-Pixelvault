@@ -215,6 +215,17 @@ BEGIN
                     CAST(GETDATE() AS DATE),
                     2
                 );
+
+                -- AUTO-GENERAR EJEMPLARES (CD KEYS) PARA JUEGOS
+                DECLARE @loop_i INT = 0;
+                DECLARE @code_prefix VARCHAR(30) = 'KEY-' + CAST(@edicionproductid AS VARCHAR) + '-';
+                WHILE @loop_i < @diff
+                BEGIN
+                    DECLARE @rand_code VARCHAR(50) = @code_prefix + SUBSTRING(REPLACE(CAST(NEWID() AS VARCHAR(36)), '-', ''), 1, 10);
+                    INSERT INTO Product.Ejemplar (productid, edicionproductid, canjear_codigo, estado)
+                    VALUES (NULL, @edicionproductid, UPPER(@rand_code), 'activo');
+                    SET @loop_i = @loop_i + 1;
+                END
             END
             ELSE IF @diff < 0
             BEGIN
@@ -226,6 +237,14 @@ BEGIN
                     ABS(@diff),
                     CAST(GETDATE() AS DATE),
                     NULL
+                );
+
+                -- Eliminar ABS(@diff) ejemplares activos de esta edición
+                DELETE FROM Product.Ejemplar
+                WHERE id_ejemplar IN (
+                    SELECT TOP (ABS(@diff)) id_ejemplar 
+                    FROM Product.Ejemplar 
+                    WHERE edicionproductid = @edicionproductid AND estado = 'activo'
                 );
             END
         END
@@ -239,17 +258,36 @@ BEGIN
                 -- Entrada
                 INSERT INTO Product.MovimientoInventario (productid, edicionproductid, cantidad, fecha, provedorid)
                 VALUES (@productid, NULL, @diff, CAST(GETDATE() AS DATE), 2);
+
+                -- AUTO-GENERAR EJEMPLARES (CD KEYS) PARA COMPLEMENTOS/DLCs
+                DECLARE @loop_p INT = 0;
+                DECLARE @code_prefix_p VARCHAR(30) = 'KEY-P' + CAST(@productid AS VARCHAR) + '-';
+                WHILE @loop_p < @diff
+                BEGIN
+                    DECLARE @rand_code_p VARCHAR(50) = @code_prefix_p + SUBSTRING(REPLACE(CAST(NEWID() AS VARCHAR(36)), '-', ''), 1, 10);
+                    INSERT INTO Product.Ejemplar (productid, edicionproductid, canjear_codigo, estado)
+                    VALUES (@productid, NULL, UPPER(@rand_code_p), 'activo');
+                    SET @loop_p = @loop_p + 1;
+                END
             END
             ELSE IF @diff < 0
             BEGIN
                 -- Salida
                 INSERT INTO Product.MovimientoInventario (productid, edicionproductid, cantidad, fecha, provedorid)
                 VALUES (@productid, NULL, ABS(@diff), CAST(GETDATE() AS DATE), NULL);
+
+                -- Eliminar ABS(@diff) ejemplares activos de este producto (DLC)
+                DELETE FROM Product.Ejemplar
+                WHERE id_ejemplar IN (
+                    SELECT TOP (ABS(@diff)) id_ejemplar 
+                    FROM Product.Ejemplar 
+                    WHERE productid = @productid AND edicionproductid IS NULL AND estado = 'activo'
+                );
             END
         END
 
         COMMIT TRANSACTION;
-        PRINT 'Stock actualizado con éxito.';
+        PRINT 'Stock y ejemplares actualizados con éxito.';
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
