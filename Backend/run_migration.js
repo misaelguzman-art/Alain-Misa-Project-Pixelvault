@@ -200,7 +200,8 @@ async function run() {
                     CREATE OR ALTER VIEW VW_TODAS_Juegos_ED_DLC AS
                     WITH catalago_juegos AS (
                         -- 1. Juegos y Ediciones Locales de Perú
-                        SELECT pp.name AS nombre_juego,
+                        SELECT pp.productid,
+                               pp.name AS nombre_juego,
                                CASE 
                                    WHEN ep.edicionproductid IS NULL THEN ed.name
                                    ELSE pp.tipo_juego
@@ -216,7 +217,8 @@ async function run() {
                         UNION ALL
                         
                         -- 2. Juegos y Ediciones Globales de Bolivia (Linked Server)
-                        SELECT pp.name AS nombre_juego,
+                        SELECT pp.productid,
+                               pp.name AS nombre_juego,
                                CASE 
                                    WHEN ep.edicionproductid IS NULL THEN ed.name
                                    ELSE pp.tipo_juego
@@ -229,7 +231,8 @@ async function run() {
                         LEFT JOIN [NODO_CENTRAL].[BD2_tienda].[Product].[Edicion] ed ON ep.edicionid = ed.edicionid
                         WHERE pp.paisid IS NULL
                     )
-                    SELECT nombre_juego, tipo_dejuego, Cabeza,
+                    SELECT productid,
+                           nombre_juego, tipo_dejuego, Cabeza,
                            COALESCE(Cabeza, nombre_juego) AS GrupoOrden,
                            CASE WHEN Cabeza IS NULL THEN 0 ELSE 1 END AS EsDLC,
                            ISNULL(p.nombre, 'Global') AS pais_ambito
@@ -240,7 +243,8 @@ async function run() {
                 await request.query(`
                     CREATE OR ALTER VIEW VW_TODAS_Juegos_ED_DLC AS
                     WITH catalago_juegos AS (
-                        SELECT pp.name AS nombre_juego,
+                        SELECT pp.productid,
+                               pp.name AS nombre_juego,
                                CASE 
                                    WHEN ep.edicionproductid IS NULL THEN ed.name
                                    ELSE pp.tipo_juego
@@ -253,7 +257,8 @@ async function run() {
                         LEFT JOIN Product.Edicion ed ON ep.edicionid = ed.edicionid
                         WHERE pp.paisid = 1 OR pp.paisid IS NULL
                     )
-                    SELECT nombre_juego, tipo_dejuego, Cabeza,
+                    SELECT productid,
+                           nombre_juego, tipo_dejuego, Cabeza,
                            COALESCE(Cabeza, nombre_juego) AS GrupoOrden,
                            CASE WHEN Cabeza IS NULL THEN 0 ELSE 1 END AS EsDLC,
                            ISNULL(p.nombre, 'Global') AS pais_ambito
@@ -489,38 +494,99 @@ async function run() {
 
                             DELETE FROM @ejemplares;
 
+                            -- Obtener el ámbito geográfico del producto
+                            DECLARE @game_paisid INT = NULL;
                             IF @edicion_actual IS NOT NULL
                             BEGIN
-                                INSERT INTO @ejemplares
-                                SELECT TOP (@cantidad_actual) id_ejemplar, canjear_codigo
-                                FROM Product.Ejemplar
-                                WHERE edicionproductid = @edicion_actual
-                                  AND estado = 'activo'
-                                  AND productid IS NULL
-                                ORDER BY id_ejemplar;
+                                SELECT @game_paisid = p.paisid 
+                                FROM Product.Product p
+                                JOIN Product.EdicionProduct ep ON ep.productid = p.productid
+                                WHERE ep.edicionproductid = @edicion_actual;
                             END
                             ELSE
                             BEGIN
-                                INSERT INTO @ejemplares
-                                SELECT TOP (@cantidad_actual) id_ejemplar, canjear_codigo
-                                FROM Product.Ejemplar
-                                WHERE productid = @productoid_actual
-                                  AND estado = 'activo'
-                                  AND edicionproductid IS NULL
-                                ORDER BY id_ejemplar;
+                                SELECT @game_paisid = paisid FROM Product.Product WHERE productid = @productoid_actual;
                             END
 
-                            IF (SELECT COUNT(*) FROM @ejemplares) < @cantidad_actual
+                            -- Obtener el nodo local
+                            DECLARE @is_peru_node INT = 0;
+                            IF OBJECT_ID('dbo.ConfiguracionLocal', 'U') IS NOT NULL
                             BEGIN
-                                DECLARE @faltantes INT = @cantidad_actual - (SELECT COUNT(*) FROM @ejemplares);
-                                DECLARE @msg NVARCHAR(200) = 'No hay suficientes códigos disponibles para "' + @producto_actual + '". Faltan ' + CAST(@faltantes AS VARCHAR(10)) + ' unidades.';
-                                THROW 50000, @msg, 1;
+                                SELECT TOP 1 @is_peru_node = CASE WHEN pais_local_id = 4 THEN 1 ELSE 0 END FROM dbo.ConfiguracionLocal;
                             END
 
-                            -- Marcar ejemplares como 'comprado'
-                            UPDATE Product.Ejemplar
-                            SET estado = 'comprado'
-                            WHERE id_ejemplar IN (SELECT id FROM @ejemplares);
+                            -- Rama Distribuida (Cliente en Perú comprando juego Global)
+                            IF @is_peru_node = 1 AND @game_paisid IS NULL
+                            BEGIN
+                                IF @edicion_actual IS NOT NULL
+                                BEGIN
+                                    INSERT INTO @ejemplares
+                                    SELECT TOP (@cantidad_actual) id_ejemplar, canjear_codigo
+                                    FROM [NODO_CENTRAL].[BD2_tienda].[Product].[Ejemplar]
+                                    WHERE edicionproductid = @edicion_actual
+                                      AND estado = 'activo'
+                                      AND productid IS NULL
+                                    ORDER BY id_ejemplar;
+                                END
+                                ELSE
+                                BEGIN
+                                    INSERT INTO @ejemplares
+                                    SELECT TOP (@cantidad_actual) id_ejemplar, canjear_codigo
+                                    FROM [NODO_CENTRAL].[BD2_tienda].[Product].[Ejemplar]
+                                    WHERE productid = @productoid_actual
+                                      AND estado = 'activo'
+                                      AND edicionproductid IS NULL
+                                    ORDER BY id_ejemplar;
+                                END
+
+                                IF (SELECT COUNT(*) FROM @ejemplares) < @cantidad_actual
+                                BEGIN
+                                    DECLARE @faltantes_g INT = @cantidad_actual - (SELECT COUNT(*) FROM @ejemplares);
+                                    DECLARE @msg_g NVARCHAR(200) = 'No hay suficientes códigos globales en Central para "' + @producto_actual + '". Faltan ' + CAST(@faltantes_g AS VARCHAR(10)) + ' unidades.';
+                                    THROW 50000, @msg_g, 1;
+                                END
+
+                                -- Marcar ejemplares como 'comprado' en Central
+                                UPDATE [NODO_CENTRAL].[BD2_tienda].[Product].[Ejemplar]
+                                SET estado = 'comprado'
+                                WHERE id_ejemplar IN (SELECT id FROM @ejemplares);
+                            END
+                            ELSE
+                            -- Rama Local Estándar (Bolivia local, o Perú local)
+                            BEGIN
+                                IF @edicion_actual IS NOT NULL
+                                BEGIN
+                                    INSERT INTO @ejemplares
+                                    SELECT TOP (@cantidad_actual) id_ejemplar, canjear_codigo
+                                    FROM Product.Ejemplar
+                                    WHERE edicionproductid = @edicion_actual
+                                      AND estado = 'activo'
+                                      AND productid IS NULL
+                                    ORDER BY id_ejemplar;
+                                END
+                                ELSE
+                                BEGIN
+                                    INSERT INTO @ejemplares
+                                    SELECT TOP (@cantidad_actual) id_ejemplar, canjear_codigo
+                                    FROM Product.Ejemplar
+                                    WHERE productid = @productoid_actual
+                                      AND estado = 'activo'
+                                      AND edicionproductid IS NULL
+                                    ORDER BY id_ejemplar;
+                                END
+
+                                IF (SELECT COUNT(*) FROM @ejemplares) < @cantidad_actual
+                                BEGIN
+                                    DECLARE @faltantes_l INT = @cantidad_actual - (SELECT COUNT(*) FROM @ejemplares);
+                                    DECLARE @msg_l NVARCHAR(200) = 'No hay suficientes códigos disponibles para "' + @producto_actual + '". Faltan ' + CAST(@faltantes_l AS VARCHAR(10)) + ' unidades.';
+                                    THROW 50000, @msg_l, 1;
+                                END
+
+                                -- Marcar ejemplares como 'comprado' localmente
+                                UPDATE Product.Ejemplar
+                                SET estado = 'comprado'
+                                WHERE id_ejemplar IN (SELECT id FROM @ejemplares);
+                            END
 
                             -- Guardar códigos
                             INSERT INTO @codigos (producto, codigo)

@@ -147,17 +147,31 @@ router.get('/juegos/stock-bajo', async (req, res) => {
 // 10. Ediciones de un juego (con stock)
 router.get('/productos/:id/ediciones', async (req, res) => {
     const productId = req.params.id;
-    console.log('ID recibido:', productId, 'tipo:', typeof productId);
+    const targetPais = req.query.pais;
+    console.log('ID recibido:', productId, 'targetPais:', targetPais);
     try {
-        const pool = req.dbPool;
-        console.log('Pool obtenido');
+        let pool = req.dbPool;
+        
+        // Si nos piden específicamente consultar a Bolivia (para un juego global desde Perú)
+        if (targetPais && targetPais.toLowerCase() === 'bolivia') {
+            const { poolBolivia } = require('./database');
+            if (!poolBolivia.connected) {
+                await poolBolivia.connect();
+            }
+            pool = poolBolivia;
+        } else if (targetPais && targetPais.toLowerCase() === 'peru') {
+            const { poolPeru } = require('./database');
+            if (!poolPeru.connected) {
+                await poolPeru.connect();
+            }
+            pool = poolPeru;
+        }
+
+        console.log('Pool obtenido para ediciones');
         const result = await pool.request()
             .input('productid', sql.Int, productId)
             .execute('ObtenerEdicionesProducto');
-        console.log('Resultado de SP:', result);
-        console.log('Recordset:', result.recordset);
         const data = result.recordset || [];
-        console.log('Datos a enviar:', data);
         res.json(data);
     } catch (err) {
         console.error('Error en endpoint /ediciones:', err);

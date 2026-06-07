@@ -92,6 +92,14 @@ class App {
         window.eliminarItem = (id, pid) => this.eliminarItem(id, pid);
         window.desactivarCuenta = () => this.desactivarCuenta();
 
+        // Nuevas funciones para MongoDB
+        window.abrirComentarios = (pid, nombre) => this.abrirComentarios(pid, nombre);
+        window.cerrarModalComentarios = () => this.cerrarModal('modal-comentarios');
+        window.enviarComentario = () => this.enviarComentario();
+        window.agregarAPlaylist = (pid, nombre, precio) => this.agregarAPlaylist(pid, nombre, precio);
+        window.eliminarDePlaylist = (pid) => this.eliminarDePlaylist(pid);
+        window.guardarDatosPlaylist = () => this.guardarDatosPlaylist();
+
         // Nuevas funciones globales para Vendedor y Admin
         window.cambiarPestanaAdmin = (tabId, btn) => this.cambiarPestanaAdmin(tabId, btn);
         window.cargarInventarioVendedor = () => this.cargarInventarioVendedor();
@@ -239,7 +247,7 @@ class App {
                 let color = colores[idx % colores.length];
                 let paisBadgeColor = j.pais_ambito === 'Peru' ? 'rgba(239, 68, 68, 0.2); color: #f87171;' : (j.pais_ambito === 'Bolivia' ? 'rgba(245, 158, 11, 0.2); color: #fbbf24;' : 'rgba(16, 185, 129, 0.2); color: #34d399;');
                 return `
-                    <div class="card" data-idx="${idx}" data-productid="${j.productid}" data-nombre="${j.nombre_juego.replace(/'/g, "\\'")}" data-tipo="${tipo}">
+                    <div class="card" data-idx="${idx}" data-productid="${j.productid}" data-nombre="${j.nombre_juego.replace(/'/g, "\\'")}" data-tipo="${tipo}" data-pais="${j.pais_ambito || 'Global'}">
                         <div class="card-header" style="background:linear-gradient(135deg,${color},${color}88)"><span style="font-size:2.5rem">${emojis[tipo] || '🎮'}</span></div>
                         <div class="card-body">
                             <h5>${j.nombre_juego}</h5>
@@ -251,7 +259,11 @@ class App {
                         </div>
                         <div class="card-footer">
                             <div class="ed-price">Ver ediciones →</div>
-                            <button class="btn btn-primario w-full mt-1 btn-agregar">+ Agregar</button>
+                            <button class="btn btn-primario w-full mt-1 btn-agregar">+ Agregar Carrito</button>
+                            <div class="flex gap-1 mt-1">
+                                <button class="btn btn-secundario flex-1" onclick="abrirComentarios(${j.productid}, '${j.nombre_juego.replace(/'/g, "\\'")}')" style="padding: 0.4rem; font-size: 0.7rem;">💬 Reseñas</button>
+                                <button class="btn btn-secundario flex-1" onclick="agregarAPlaylist(${j.productid}, '${j.nombre_juego.replace(/'/g, "\\'")}', ${j.precio || 0})" style="padding: 0.4rem; font-size: 0.7rem;">⭐ Playlist</button>
+                            </div>
                             <div class="edition-picker" id="picker-${idx}"><h6 class="label">Elige edición</h6><div id="editions-${idx}"><div class="spinner"></div></div></div>
                         </div>
                     </div>`;
@@ -277,7 +289,13 @@ class App {
                 editionsDiv.dataset.loaded = '1';
                 return;
             }
-            const res = await fetch(`http://localhost:3000/api/productos/${productId}/ediciones`);
+            
+            // Determinar el país/ámbito para realizar la consulta enrutada
+            let card = picker.closest('.card');
+            let paisAmbito = card ? card.dataset.pais : 'Global';
+            const targetPais = (paisAmbito === 'Global' || paisAmbito === 'global') ? 'bolivia' : (localStorage.getItem('sucursal') || 'bolivia');
+
+            const res = await fetch(`http://localhost:3000/api/productos/${productId}/ediciones?pais=${targetPais}`);
             const text = await res.text();
             let eds = [];
             try {
@@ -527,10 +545,12 @@ class App {
     cambiarPestana(pestana, btn) {
         document.getElementById('pestana-catalogo').classList.toggle('hidden', pestana !== 'catalogo');
         document.getElementById('pestana-historial').classList.toggle('hidden', pestana !== 'historial');
+        document.getElementById('pestana-playlists').classList.toggle('hidden', pestana !== 'playlists');
         document.getElementById('pestana-perfil').classList.toggle('hidden', pestana !== 'perfil');
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         if (btn) btn.classList.add('active');
         if (pestana === 'historial') this.cargarHistorial();
+        if (pestana === 'playlists') this.cargarPlaylist();
         if (pestana === 'perfil') { this.cargarPerfil(); this.cargarPagos(); }
     }
 
@@ -624,6 +644,184 @@ class App {
         document.getElementById(id).classList.add('hidden');
         if (id === 'modal-agregar-pago') { document.getElementById('pago-numero').value = ''; document.getElementById('pago-cvv').value = ''; document.getElementById('pago-fecha').value = ''; }
         if (id === 'modal-eliminar-pago') this.pagoAEliminar = null;
+    }
+
+    // ============================================================
+    // SECCIÓN MONGODB (COMENTARIOS Y PLAYLISTS)
+    // ============================================================
+    async abrirComentarios(productId, nombreJuego) {
+        document.getElementById('comentarios-titulo').textContent = `Comentarios: ${nombreJuego}`;
+        document.getElementById('comentario-productid').value = productId;
+        document.getElementById('comentario-texto').value = '';
+        if (this.usuario && this.usuario.email) {
+            document.getElementById('comentario-gmail').value = this.usuario.email;
+        }
+        
+        let lista = document.getElementById('comentarios-lista');
+        lista.innerHTML = '<div class="text-center"><div class="spinner"></div></div>';
+        this.mostrarModal('modal-comentarios');
+
+        try {
+            let comentarios = await this.api.get(`/comentarios/${productId}`);
+            if (!comentarios || comentarios.length === 0) {
+                lista.innerHTML = '<div class="text-center" style="color:var(--texto-sec)">No hay comentarios aún. ¡Sé el primero!</div>';
+            } else {
+                lista.innerHTML = comentarios.map(c => `
+                    <div style="border-bottom: 1px solid var(--borde); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <div class="flex between center mb-1">
+                            <strong>${c.autor}</strong>
+                            <span style="font-size:0.7rem; color:var(--texto-sec)">${new Date(c.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <div style="font-size:0.85rem">${c.comentario}</div>
+                    </div>
+                `).join('');
+            }
+        } catch (err) {
+            lista.innerHTML = '<div class="text-center" style="color:var(--rojo)">Error al cargar comentarios</div>';
+        }
+    }
+
+    async enviarComentario() {
+        if (!this.usuario) return this.toast('Debes iniciar sesión para comentar', 'error');
+        
+        let productId = document.getElementById('comentario-productid').value;
+        let email = document.getElementById('comentario-gmail').value.trim() || this.usuario.email;
+        let texto = document.getElementById('comentario-texto').value.trim();
+
+        if (!texto) return this.toast('El comentario no puede estar vacío', 'error');
+
+        try {
+            await this.api.post('/comentarios', {
+                productId: parseInt(productId),
+                clienteId: this.usuario.id,
+                autor: `${this.usuario.nombre} ${this.usuario.apellido}`,
+                gmail: email,
+                comentario: texto
+            });
+            this.toast('Comentario enviado con éxito');
+            // Recargar comentarios
+            this.abrirComentarios(productId, document.getElementById('comentarios-titulo').textContent.replace('Comentarios: ', ''));
+        } catch (err) {
+            this.toast('Error al enviar comentario', 'error');
+        }
+    }
+
+    async cargarPlaylist() {
+        if (!this.usuario) return;
+        let container = document.getElementById('playlist-contenedor');
+        container.innerHTML = '<div class="text-center w-full mt-2"><div class="spinner"></div></div>';
+        
+        try {
+            let data = await this.api.get(`/playlists/${this.usuario.id}`);
+            
+            if (data && data.id_cliente) {
+                document.getElementById('playlist-nombre').value = data.nombre || '';
+                document.getElementById('playlist-comentario').value = data.Comentario || '';
+                this.playlistActual = data;
+                
+                if (!data.listaproductos || data.listaproductos.length === 0) {
+                    container.innerHTML = '<div class="text-center w-full" style="color:var(--texto-sec); grid-column: 1 / -1; padding: 2rem;">Tu playlist está vacía. Añade juegos desde el catálogo.</div>';
+                } else {
+                    container.innerHTML = data.listaproductos.map(j => `
+                        <div class="card" style="border-color: var(--amarillo)">
+                            <div class="card-header" style="background:linear-gradient(135deg,#f59e0b,#f59e0b88)"><span style="font-size:2.5rem">⭐</span></div>
+                            <div class="card-body">
+                                <h5>${j.nombre}</h5>
+                                <div class="ed-price mt-1">$${j.precio ? j.precio.toFixed(2) : '0.00'}</div>
+                            </div>
+                            <div class="card-footer">
+                                <button class="btn btn-peligro w-full mt-1" onclick="eliminarDePlaylist(${j.productId})">Eliminar</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } else {
+                // No existe playlist
+                this.playlistActual = {
+                    id_cliente: this.usuario.id,
+                    nombre: `Playlist de ${this.usuario.nombre}`,
+                    email: this.usuario.email,
+                    Comentario: 'Mi selección favorita',
+                    listaproductos: []
+                };
+                document.getElementById('playlist-nombre').value = this.playlistActual.nombre;
+                document.getElementById('playlist-comentario').value = this.playlistActual.Comentario;
+                container.innerHTML = '<div class="text-center w-full" style="color:var(--texto-sec); grid-column: 1 / -1; padding: 2rem;">Tu playlist está vacía. Añade juegos desde el catálogo.</div>';
+            }
+        } catch (err) {
+            console.error('Error cargando playlist:', err);
+            container.innerHTML = '<div class="text-center w-full" style="color:var(--rojo); grid-column: 1 / -1;">Error al cargar playlist</div>';
+        }
+    }
+
+    async guardarDatosPlaylist() {
+        if (!this.usuario) return;
+        let nombre = document.getElementById('playlist-nombre').value.trim();
+        let comentario = document.getElementById('playlist-comentario').value.trim();
+        
+        if (!nombre || !comentario) return this.toast('Completa nombre y comentario', 'error');
+
+        let lista = this.playlistActual ? this.playlistActual.listaproductos : [];
+
+        try {
+            await this.api.post('/playlists', {
+                id_cliente: this.usuario.id,
+                nombre: nombre,
+                email: this.usuario.email,
+                Comentario: comentario,
+                listaproductos: lista
+            });
+            this.toast('Configuración de Playlist guardada');
+            await this.cargarPlaylist();
+        } catch (err) {
+            this.toast('Error al guardar playlist', 'error');
+        }
+    }
+
+    async agregarAPlaylist(productId, nombre, precio) {
+        if (!this.usuario) return this.toast('Debes iniciar sesión para usar Playlists', 'error');
+        
+        try {
+            // Obtener playlist actual
+            let res = await this.api.get(`/playlists/${this.usuario.id}`);
+            let playlist = res && res.id_cliente ? res : {
+                id_cliente: this.usuario.id,
+                nombre: `Playlist de ${this.usuario.nombre}`,
+                email: this.usuario.email,
+                Comentario: 'Mi selección favorita',
+                listaproductos: []
+            };
+
+            // Verificar si ya existe
+            if (playlist.listaproductos.find(p => p.productId === productId)) {
+                return this.toast('El juego ya está en tu Playlist', 'error');
+            }
+
+            // Agregar
+            playlist.listaproductos.push({
+                productId: productId,
+                nombre: nombre,
+                imagen: '', // Sin imagen
+                precio: precio
+            });
+
+            // Guardar
+            await this.api.post('/playlists', playlist);
+            this.toast(`✅ ${nombre} añadido a tu Playlist`);
+        } catch (err) {
+            this.toast('Error al añadir a playlist', 'error');
+        }
+    }
+
+    async eliminarDePlaylist(productId) {
+        if (!this.usuario) return;
+        try {
+            await this.api.delete(`/playlists/${this.usuario.id}/productos/${productId}`);
+            this.toast('Juego eliminado de la Playlist');
+            await this.cargarPlaylist();
+        } catch (err) {
+            this.toast('Error al eliminar juego', 'error');
+        }
     }
 
     // ============================================================

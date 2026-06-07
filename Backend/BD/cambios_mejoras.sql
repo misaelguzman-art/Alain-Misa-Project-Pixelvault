@@ -195,6 +195,35 @@ BEGIN
             RETURN;
         END
 
+        DECLARE @is_peru_node INT = 0;
+        IF OBJECT_ID('dbo.ConfiguracionLocal', 'U') IS NOT NULL
+        BEGIN
+            SELECT TOP 1 @is_peru_node = CASE WHEN pais_local_id = 4 THEN 1 ELSE 0 END FROM dbo.ConfiguracionLocal;
+        END
+
+        DECLARE @existe_local BIT = 0;
+        IF @edicionproductid IS NOT NULL
+        BEGIN
+            IF EXISTS (SELECT 1 FROM Product.EdicionProduct WHERE edicionproductid = @edicionproductid)
+                SET @existe_local = 1;
+        END
+        ELSE IF @productid IS NOT NULL
+        BEGIN
+            IF EXISTS (SELECT 1 FROM Product.Product WHERE productid = @productid)
+                SET @existe_local = 1;
+        END
+
+        IF @is_peru_node = 1 AND @existe_local = 0
+        BEGIN
+            EXEC [NODO_CENTRAL].[BD2_tienda].[dbo].[ActualizarInventarioStock] 
+                @productid = @productid,
+                @edicionproductid = @edicionproductid,
+                @cantidad = @cantidad;
+            COMMIT TRANSACTION;
+            PRINT 'Stock actualizado en el Nodo Central (Global).';
+            RETURN;
+        END
+
         DECLARE @stock_actual INT = 0;
         DECLARE @diff INT = 0;
 
@@ -766,38 +795,99 @@ BEGIN
 
             DELETE FROM @ejemplares;
 
+            -- Obtener el ámbito geográfico del producto
+            DECLARE @game_paisid INT = NULL;
             IF @edicion_actual IS NOT NULL
             BEGIN
-                INSERT INTO @ejemplares
-                SELECT TOP (@cantidad_actual) id_ejemplar, canjear_codigo
-                FROM Product.Ejemplar
-                WHERE edicionproductid = @edicion_actual
-                  AND estado = 'activo'
-                  AND productid IS NULL
-                ORDER BY id_ejemplar;
+                SELECT @game_paisid = p.paisid 
+                FROM Product.Product p
+                JOIN Product.EdicionProduct ep ON ep.productid = p.productid
+                WHERE ep.edicionproductid = @edicion_actual;
             END
             ELSE
             BEGIN
-                INSERT INTO @ejemplares
-                SELECT TOP (@cantidad_actual) id_ejemplar, canjear_codigo
-                FROM Product.Ejemplar
-                WHERE productid = @productoid_actual
-                  AND estado = 'activo'
-                  AND edicionproductid IS NULL
-                ORDER BY id_ejemplar;
+                SELECT @game_paisid = paisid FROM Product.Product WHERE productid = @productoid_actual;
             END
 
-            IF (SELECT COUNT(*) FROM @ejemplares) < @cantidad_actual
+            -- Obtener el nodo local
+            DECLARE @is_peru_node INT = 0;
+            IF OBJECT_ID('dbo.ConfiguracionLocal', 'U') IS NOT NULL
             BEGIN
-                DECLARE @faltantes INT = @cantidad_actual - (SELECT COUNT(*) FROM @ejemplares);
-                DECLARE @msg NVARCHAR(200) = 'No hay suficientes códigos disponibles para "' + @producto_actual + '". Faltan ' + CAST(@faltantes AS VARCHAR(10)) + ' unidades.';
-                THROW 50000, @msg, 1;
+                SELECT TOP 1 @is_peru_node = CASE WHEN pais_local_id = 4 THEN 1 ELSE 0 END FROM dbo.ConfiguracionLocal;
             END
 
-            -- Marcar ejemplares como 'comprado'
-            UPDATE Product.Ejemplar
-            SET estado = 'comprado'
-            WHERE id_ejemplar IN (SELECT id FROM @ejemplares);
+            -- Rama Distribuida (Cliente en Perú comprando juego Global)
+            IF @is_peru_node = 1 AND @game_paisid IS NULL
+            BEGIN
+                IF @edicion_actual IS NOT NULL
+                BEGIN
+                    INSERT INTO @ejemplares
+                    SELECT TOP (@cantidad_actual) id_ejemplar, canjear_codigo
+                    FROM [NODO_CENTRAL].[BD2_tienda].[Product].[Ejemplar]
+                    WHERE edicionproductid = @edicion_actual
+                      AND estado = 'activo'
+                      AND productid IS NULL
+                    ORDER BY id_ejemplar;
+                END
+                ELSE
+                BEGIN
+                    INSERT INTO @ejemplares
+                    SELECT TOP (@cantidad_actual) id_ejemplar, canjear_codigo
+                    FROM [NODO_CENTRAL].[BD2_tienda].[Product].[Ejemplar]
+                    WHERE productid = @productoid_actual
+                      AND estado = 'activo'
+                      AND edicionproductid IS NULL
+                    ORDER BY id_ejemplar;
+                END
+
+                IF (SELECT COUNT(*) FROM @ejemplares) < @cantidad_actual
+                BEGIN
+                    DECLARE @faltantes_g INT = @cantidad_actual - (SELECT COUNT(*) FROM @ejemplares);
+                    DECLARE @msg_g NVARCHAR(200) = 'No hay suficientes códigos globales en Central para "' + @producto_actual + '". Faltan ' + CAST(@faltantes_g AS VARCHAR(10)) + ' unidades.';
+                    THROW 50000, @msg_g, 1;
+                END
+
+                -- Marcar ejemplares como 'comprado' en Central
+                UPDATE [NODO_CENTRAL].[BD2_tienda].[Product].[Ejemplar]
+                SET estado = 'comprado'
+                WHERE id_ejemplar IN (SELECT id FROM @ejemplares);
+            END
+            ELSE
+            -- Rama Local Estándar (Bolivia local, o Perú local)
+            BEGIN
+                IF @edicion_actual IS NOT NULL
+                BEGIN
+                    INSERT INTO @ejemplares
+                    SELECT TOP (@cantidad_actual) id_ejemplar, canjear_codigo
+                    FROM Product.Ejemplar
+                    WHERE edicionproductid = @edicion_actual
+                      AND estado = 'activo'
+                      AND productid IS NULL
+                    ORDER BY id_ejemplar;
+                END
+                ELSE
+                BEGIN
+                    INSERT INTO @ejemplares
+                    SELECT TOP (@cantidad_actual) id_ejemplar, canjear_codigo
+                    FROM Product.Ejemplar
+                    WHERE productid = @productoid_actual
+                      AND estado = 'activo'
+                      AND edicionproductid IS NULL
+                    ORDER BY id_ejemplar;
+                END
+
+                IF (SELECT COUNT(*) FROM @ejemplares) < @cantidad_actual
+                BEGIN
+                    DECLARE @faltantes_l INT = @cantidad_actual - (SELECT COUNT(*) FROM @ejemplares);
+                    DECLARE @msg_l NVARCHAR(200) = 'No hay suficientes códigos disponibles para "' + @producto_actual + '". Faltan ' + CAST(@faltantes_l AS VARCHAR(10)) + ' unidades.';
+                    THROW 50000, @msg_l, 1;
+                END
+
+                -- Marcar ejemplares como 'comprado' localmente
+                UPDATE Product.Ejemplar
+                SET estado = 'comprado'
+                WHERE id_ejemplar IN (SELECT id FROM @ejemplares);
+            END
 
             -- Guardar códigos
             INSERT INTO @codigos (producto, codigo)
@@ -824,6 +914,21 @@ BEGIN
         DECLARE @err_msg NVARCHAR(MAX) = ERROR_MESSAGE();
         THROW 50000, @err_msg, 1;
     END CATCH
+END;
+GO
+
+-- ============================================================
+-- 6.5 SP PARA REGISTRAR SALIDA DE INVENTARIO REMOTO
+-- ============================================================
+CREATE OR ALTER PROCEDURE dbo.RegistrarSalidaInventario
+    @productid INT = NULL,
+    @edicionproductid INT = NULL,
+    @cantidad INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO Product.MovimientoInventario (productid, edicionproductid, cantidad, fecha, provedorid)
+    VALUES (@productid, @edicionproductid, @cantidad, CAST(GETDATE() AS DATE), NULL);
 END;
 GO
 
@@ -859,6 +964,7 @@ begin
                     RAISERROR('se intento agregar una promo que ya expiro para la fecha de entrega', 16, 1);
                 END
 
+                -- 1. Insertar para productos LOCALES
                 INSERT INTO Product.MovimientoInventario (productid, edicionproductid, cantidad, fecha, provedorid)
                 SELECT 
                     det.productoid,
@@ -870,7 +976,49 @@ begin
                 LEFT JOIN Product.EdicionProduct ep ON ep.productid = det.productoid
                 JOIN inserted i ON i.pedido_id = det.pedido_id
                 JOIN deleted d ON d.pedido_id = i.pedido_id
-                WHERE i.estado = 'entregado' AND d.estado <> 'entregado';
+                WHERE i.estado = 'entregado' AND d.estado <> 'entregado'
+                  AND (
+                      (det.edicionproductid IS NOT NULL AND EXISTS (SELECT 1 FROM Product.EdicionProduct WHERE edicionproductid = det.edicionproductid))
+                      OR 
+                      (det.edicionproductid IS NULL AND EXISTS (SELECT 1 FROM Product.Product WHERE productid = det.productoid))
+                  );
+
+                -- 2. Manejar productos GLOBALES (NODO_CENTRAL)
+                DECLARE @is_peru_node INT = 0;
+                IF OBJECT_ID('dbo.ConfiguracionLocal', 'U') IS NOT NULL
+                BEGIN
+                    SELECT TOP 1 @is_peru_node = CASE WHEN pais_local_id = 4 THEN 1 ELSE 0 END FROM dbo.ConfiguracionLocal;
+                END
+
+                IF @is_peru_node = 1
+                BEGIN
+                    DECLARE @g_productoid INT, @g_edicionid INT, @g_cantidad INT;
+                    DECLARE global_cursor CURSOR FOR
+                    SELECT 
+                        det.productoid,
+                        det.edicionproductid,
+                        det.cantidad_pedida
+                    FROM Venta.PedidoDetalles det  
+                    JOIN inserted i ON i.pedido_id = det.pedido_id
+                    JOIN deleted d ON d.pedido_id = i.pedido_id
+                    WHERE i.estado = 'entregado' AND d.estado <> 'entregado'
+                      AND NOT EXISTS (SELECT 1 FROM Product.EdicionProduct WHERE edicionproductid = det.edicionproductid)
+                      AND NOT EXISTS (SELECT 1 FROM Product.Product WHERE productid = det.productoid);
+
+                    OPEN global_cursor;
+                    FETCH NEXT FROM global_cursor INTO @g_productoid, @g_edicionid, @g_cantidad;
+                    WHILE @@FETCH_STATUS = 0
+                    BEGIN
+                        EXEC [NODO_CENTRAL].[BD2_tienda].[dbo].[RegistrarSalidaInventario] 
+                             @productid = @g_productoid, 
+                             @edicionproductid = @g_edicionid, 
+                             @cantidad = @g_cantidad;
+                             
+                        FETCH NEXT FROM global_cursor INTO @g_productoid, @g_edicionid, @g_cantidad;
+                    END
+                    CLOSE global_cursor;
+                    DEALLOCATE global_cursor;
+                END
 
             COMMIT TRANSACTION;
         END TRY

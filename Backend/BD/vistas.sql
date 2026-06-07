@@ -62,7 +62,8 @@ FECHA: 12/06/2024
 
 Create or alter View VW_TODAS_Juegos_ED_DLC as
 with catalago_juegos as (
-select pp.name as nombre_juego ,
+select pp.productid,
+pp.name as nombre_juego ,
 Case 
 when ep.edicionproductid is null then ed.name
 else pp.tipo_juego
@@ -76,7 +77,7 @@ on ep.edicionproductid = pp.productid
 inner join Product.Edicion ed
 on ep.edicionid = ed.edicionid
 )
-select nombre_juego, tipo_dejuego, Cabeza ,
+select productid, nombre_juego, tipo_dejuego, Cabeza ,
 COALESCE(Cabeza, nombre_juego) AS GrupoOrden,
     CASE WHEN Cabeza IS NULL THEN 0 ELSE 1 END AS EsDLC
 from catalago_juegos

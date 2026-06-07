@@ -435,6 +435,7 @@
                 <div class="tabs">
                     <button class="tab active" onclick="cambiarPestana('catalogo', this)">🎮 Catálogo</button>
                     <button class="tab" onclick="cambiarPestana('historial', this)">📦 Mis Pedidos</button>
+                    <button class="tab" onclick="cambiarPestana('playlists', this)">⭐ Mis Playlists</button>
                     <button class="tab" onclick="cambiarPestana('perfil', this)">👤 Mi Perfil</button>
                 </div>
 
@@ -454,6 +455,25 @@
                         <p>Historial de compras entregadas</p>
                     </div>
                     <div id="historial-contenedor"></div>
+                </div>
+
+                <!-- PLAYLISTS -->
+                <div id="pestana-playlists" class="hidden">
+                    <div class="encabezado-seccion mb-2">
+                        <h3>Mis Playlists</h3>
+                        <p>Tus juegos favoritos guardados</p>
+                    </div>
+                    
+                    <div class="panel mb-2">
+                        <div class="panel-header"><h4>Configuración de la Playlist</h4></div>
+                        <div class="panel-body flex gap-1 col">
+                            <input type="text" id="playlist-nombre" class="input w-full" placeholder="Nombre de la Playlist (Ej: Top Favoritos)">
+                            <textarea id="playlist-comentario" class="input w-full" placeholder="Comentario o descripción..." rows="2"></textarea>
+                            <button class="btn btn-primario" onclick="guardarDatosPlaylist()">Guardar Configuración</button>
+                        </div>
+                    </div>
+
+                    <div id="playlist-contenedor" class="grid-catalogo"></div>
                 </div>
 
                 <!-- PERFIL (gestión de métodos de pago) -->
@@ -778,6 +798,30 @@
             <h3>Eliminar Método de Pago</h3>
             <p>¿Estás seguro de que deseas eliminar esta tarjeta?</p>
             <div class="flex gap-1 mt-2"><button class="btn btn-secundario flex-1" onclick="cerrarModalEliminarPago()">Cancelar</button><button class="btn btn-peligro flex-1" id="btn-confirmar-eliminar">Eliminar</button></div>
+        </div>
+    </div>
+
+    <!-- MODAL PARA COMENTARIOS -->
+    <div class="modal-overlay hidden" id="modal-comentarios">
+        <div class="modal" style="max-width: 500px; max-height: 90vh; overflow-y: auto;">
+            <h3 id="comentarios-titulo">Comentarios del Juego</h3>
+            <div id="comentarios-lista" class="mb-2" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--borde); padding: 1rem; border-radius: var(--radio); background: var(--surface2);">
+                <div class="text-center" style="color:var(--texto-sec)">Cargando comentarios...</div>
+            </div>
+            
+            <div class="divider"></div>
+            <h4>Deja tu comentario</h4>
+            <input type="hidden" id="comentario-productid">
+            <div class="mb-1">
+                <input type="email" id="comentario-gmail" class="input w-full" placeholder="Tu Email (Opcional si quieres usar otro)">
+            </div>
+            <div class="mb-1">
+                <textarea id="comentario-texto" class="input w-full" placeholder="Escribe tu comentario aquí..." rows="3"></textarea>
+            </div>
+            <div class="flex gap-1 mt-2">
+                <button class="btn btn-secundario flex-1" onclick="cerrarModalComentarios()">Cerrar</button>
+                <button class="btn btn-primario flex-1" onclick="enviarComentario()">Enviar Comentario</button>
+            </div>
         </div>
     </div>
 
