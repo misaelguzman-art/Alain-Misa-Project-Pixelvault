@@ -11,10 +11,10 @@ const configBolivia = {
 
 // Configuración para el Nodo Sucursal (Perú - Colega)
 const configPeru = {
-    user: 'Admin', 
-    password: 'admin',
-    server: 'DESKTOP-44CCO3Q', 
-    database: 'NodoSucursal',
+    user: 'Usuario_admin', 
+    password: '123456',
+    server: 'DESKTOP-GKFCRF1', 
+    database: 'BD2_Peru',
     options: { encrypt: false, trustServerCertificate: true }
 };
 
