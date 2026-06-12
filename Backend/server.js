@@ -25,5 +25,23 @@ app.use('/api', spRoutes);
 app.use('/api', vistasRoutes);
 app.use('/api', mongoRoutes);
 
+const http = require('http');
+const { Server } = require('socket.io');
+
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: { origin: "*" }
+});
+
+// Guardar io en app para poder usarlo en las rutas
+app.set('io', io);
+
+io.on('connection', (socket) => {
+    console.log('🔌 Nuevo usuario conectado via WebSocket');
+    socket.on('disconnect', () => {
+        console.log('🔌 Usuario desconectado');
+    });
+});
+
 const PORT = 3000;
-app.listen(PORT, () => console.log(`🚀 Servidor modular corriendo en puerto ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Servidor modular corriendo en puerto ${PORT}`));

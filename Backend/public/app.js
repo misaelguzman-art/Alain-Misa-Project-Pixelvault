@@ -61,6 +61,14 @@ class App {
         this.mostrarRegistro();
         this.setupEventDelegation();
 
+        // Configurar Socket.io para tiempo real
+        this.socket = window.io ? window.io() : null;
+        if (this.socket) {
+            this.socket.on('nuevo_comentario', (comentario) => {
+                this.onNuevoComentarioRealtime(comentario);
+            });
+        }
+
         // Sincronizar el select de sucursal con el valor guardado
         setTimeout(() => {
             const select = document.getElementById('select-sucursal');
@@ -68,6 +76,32 @@ class App {
                 select.value = localStorage.getItem('sucursal') || 'bolivia';
             }
         }, 100);
+    }
+
+    onNuevoComentarioRealtime(comentario) {
+        // Solo actualizar si el modal de comentarios está abierto y viendo el mismo producto
+        const modal = document.getElementById('modal-comentarios');
+        if (modal && !modal.classList.contains('hidden')) {
+            const productIdActual = document.getElementById('comentario-productid').value;
+            if (productIdActual == comentario.productId) {
+                const lista = document.getElementById('comentarios-lista');
+                // Quitar mensaje de "No hay comentarios" si existe
+                if (lista.innerHTML.includes('No hay comentarios aún')) {
+                    lista.innerHTML = '';
+                }
+                const html = `
+                    <div style="border-bottom: 1px solid var(--borde); padding-bottom: 0.5rem; margin-bottom: 0.5rem; animation: fadeIn 0.5s ease; background: rgba(124,58,237,0.1);">
+                        <div class="flex between center mb-1">
+                            <strong>${comentario.autor}</strong>
+                            <span style="font-size:0.7rem; color:var(--texto-sec)">${new Date(comentario.createdAt).toLocaleDateString()} (Nuevo)</span>
+                        </div>
+                        <div style="font-size:0.85rem">${comentario.comentario}</div>
+                    </div>
+                `;
+                // Insertar al principio porque están ordenados de más recientes primero
+                lista.insertAdjacentHTML('afterbegin', html);
+            }
+        }
     }
 
     bindGlobalFunctions() {
@@ -699,8 +733,8 @@ class App {
                 comentario: texto
             });
             this.toast('Comentario enviado con éxito');
-            // Recargar comentarios
-            this.abrirComentarios(productId, document.getElementById('comentarios-titulo').textContent.replace('Comentarios: ', ''));
+            document.getElementById('comentario-texto').value = '';
+            // No recargamos aquí manualmente, porque Socket.io lo insertará
         } catch (err) {
             this.toast('Error al enviar comentario', 'error');
         }

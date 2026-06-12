@@ -38,6 +38,13 @@ router.post('/comentarios', async (req, res) => {
         });
 
         await nuevoComentario.save();
+
+        // Emitir el evento a todos los clientes conectados
+        const io = req.app.get('io');
+        if (io) {
+            io.emit('nuevo_comentario', nuevoComentario);
+        }
+
         res.status(201).json(nuevoComentario);
     } catch (error) {
         console.error('Error al crear comentario:', error);
