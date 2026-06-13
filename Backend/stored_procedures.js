@@ -133,7 +133,11 @@ router.get('/juegos/todo', async (req, res) => {
             // BOLIVIA ve: Sus juegos locales + Juegos Globales (que ya están en su propia BD)
             if (!poolBolivia.connected) await poolBolivia.connect();
             const resBolivia = await poolBolivia.request().execute('sp_mostrar_juegos_ED_DLC');
-            list.push(...resBolivia.recordset);
+            const boliviaGames = resBolivia.recordset.map(j => ({ 
+                ...j, 
+                pais_ambito: j.nombre_juego.toLowerCase().includes('(global)') ? 'Global' : 'Bolivia' 
+            }));
+            list.push(...boliviaGames);
         } else if (sucursal === 'peru') {
             // PERÚ ve: Sus juegos locales (Perú) + Juegos Globales (desde Bolivia)
             
@@ -141,27 +145,27 @@ router.get('/juegos/todo', async (req, res) => {
             try {
                 if (!poolPeru.connected) await poolPeru.connect();
                 const resPeru = await poolPeru.request().execute('sp_mostrar_juegos_ED_DLC');
-                list.push(...resPeru.recordset);
+                const peruGames = resPeru.recordset.map(j => ({ ...j, pais_ambito: 'Peru' }));
+                list.push(...peruGames);
             } catch (e) { console.log('⚠️ Error Perú:', e.message); }
 
             // 2. Traer SOLO los juegos Globales desde Bolivia
             try {
                 if (!poolBolivia.connected) await poolBolivia.connect();
                 const resBolivia = await poolBolivia.request().execute('sp_mostrar_juegos_ED_DLC');
-                // Filtrar para que solo pasen los que digan (Global)
-                const globalesDeBolivia = resBolivia.recordset.filter(j => 
-                    j.nombre_juego.toLowerCase().includes('(global)')
-                );
+                const globalesDeBolivia = resBolivia.recordset
+                    .filter(j => j.nombre_juego.toLowerCase().includes('(global)'))
+                    .map(j => ({ ...j, pais_ambito: 'Global' }));
                 list.push(...globalesDeBolivia);
             } catch (e) { console.log('⚠️ Error trayendo globales de Bolivia:', e.message); }
         }
 
-        // Eliminar duplicados por si acaso
+        // Eliminar duplicados usando el NOMBRE DEL JUEGO (ya que los IDs pueden repetirse entre bases de datos diferentes)
         const juegosUnicos = [];
-        const idsVistos = new Set();
+        const nombresVistos = new Set();
         for (const juego of list) {
-            if (!idsVistos.has(juego.productid)) {
-                idsVistos.add(juego.productid);
+            if (!nombresVistos.has(juego.nombre_juego)) {
+                nombresVistos.add(juego.nombre_juego);
                 juegosUnicos.push(juego);
             }
         }
