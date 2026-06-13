@@ -133,10 +133,7 @@ router.get('/juegos/todo', async (req, res) => {
             // BOLIVIA ve: Sus juegos locales + Juegos Globales (que ya están en su propia BD)
             if (!poolBolivia.connected) await poolBolivia.connect();
             const resBolivia = await poolBolivia.request().execute('sp_mostrar_juegos_ED_DLC');
-            const boliviaGames = resBolivia.recordset.map(j => ({ 
-                ...j, 
-                pais_ambito: j.nombre_juego.toLowerCase().includes('(global)') ? 'Global' : 'Bolivia' 
-            }));
+            const boliviaGames = resBolivia.recordset; // Ya viene con pais_ambito de la vista
             list.push(...boliviaGames);
         } else if (sucursal === 'peru') {
             // PERÚ ve: Sus juegos locales (Perú) + Juegos Globales (desde Bolivia)
@@ -145,7 +142,7 @@ router.get('/juegos/todo', async (req, res) => {
             try {
                 if (!poolPeru.connected) await poolPeru.connect();
                 const resPeru = await poolPeru.request().execute('sp_mostrar_juegos_ED_DLC');
-                const peruGames = resPeru.recordset.map(j => ({ ...j, pais_ambito: 'Peru' }));
+                const peruGames = resPeru.recordset; // Ya viene con pais_ambito de la vista
                 list.push(...peruGames);
             } catch (e) { console.log('⚠️ Error Perú:', e.message); }
 
@@ -154,8 +151,7 @@ router.get('/juegos/todo', async (req, res) => {
                 if (!poolBolivia.connected) await poolBolivia.connect();
                 const resBolivia = await poolBolivia.request().execute('sp_mostrar_juegos_ED_DLC');
                 const globalesDeBolivia = resBolivia.recordset
-                    .filter(j => j.nombre_juego.toLowerCase().includes('(global)'))
-                    .map(j => ({ ...j, pais_ambito: 'Global' }));
+                    .filter(j => j.pais_ambito === 'Global'); // Filtrar usando la propiedad real
                 list.push(...globalesDeBolivia);
             } catch (e) { console.log('⚠️ Error trayendo globales de Bolivia:', e.message); }
         }
