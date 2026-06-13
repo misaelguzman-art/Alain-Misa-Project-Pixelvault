@@ -52,6 +52,68 @@ router.post('/comentarios', async (req, res) => {
     }
 });
 
+// Dar Like a un comentario
+router.post('/comentarios/:id/like', async (req, res) => {
+    try {
+        const { clienteId } = req.body;
+        if (!clienteId) return res.status(400).json({ error: 'clienteId es requerido' });
+
+        const comentario = await ComentarioProducto.findById(req.params.id);
+        if (!comentario) return res.status(404).json({ error: 'Comentario no encontrado' });
+
+        // Si ya tiene dislike, se lo quitamos
+        comentario.dislikes = comentario.dislikes.filter(id => id !== clienteId);
+
+        // Toggle del like
+        if (comentario.likes.includes(clienteId)) {
+            comentario.likes = comentario.likes.filter(id => id !== clienteId);
+        } else {
+            comentario.likes.push(clienteId);
+        }
+
+        await comentario.save();
+
+        const io = req.app.get('io');
+        if (io) io.emit('actualizar_comentario', comentario);
+
+        res.json(comentario);
+    } catch (error) {
+        console.error('Error al dar like:', error);
+        res.status(500).json({ error: 'Error al procesar el like' });
+    }
+});
+
+// Dar Dislike a un comentario
+router.post('/comentarios/:id/dislike', async (req, res) => {
+    try {
+        const { clienteId } = req.body;
+        if (!clienteId) return res.status(400).json({ error: 'clienteId es requerido' });
+
+        const comentario = await ComentarioProducto.findById(req.params.id);
+        if (!comentario) return res.status(404).json({ error: 'Comentario no encontrado' });
+
+        // Si ya tiene like, se lo quitamos
+        comentario.likes = comentario.likes.filter(id => id !== clienteId);
+
+        // Toggle del dislike
+        if (comentario.dislikes.includes(clienteId)) {
+            comentario.dislikes = comentario.dislikes.filter(id => id !== clienteId);
+        } else {
+            comentario.dislikes.push(clienteId);
+        }
+
+        await comentario.save();
+
+        const io = req.app.get('io');
+        if (io) io.emit('actualizar_comentario', comentario);
+
+        res.json(comentario);
+    } catch (error) {
+        console.error('Error al dar dislike:', error);
+        res.status(500).json({ error: 'Error al procesar el dislike' });
+    }
+});
+
 // ==========================================
 // RUTAS PARA PLAYLISTS DE CLIENTES
 // ==========================================

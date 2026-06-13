@@ -67,6 +67,9 @@ class App {
             this.socket.on('nuevo_comentario', (comentario) => {
                 this.onNuevoComentarioRealtime(comentario);
             });
+            this.socket.on('actualizar_comentario', (comentario) => {
+                this.onActualizarComentarioRealtime(comentario);
+            });
         }
 
         // Sincronizar el select de sucursal con el valor guardado
@@ -89,19 +92,46 @@ class App {
                 if (lista.innerHTML.includes('No hay comentarios aún')) {
                     lista.innerHTML = '';
                 }
-                const html = `
-                    <div style="border-bottom: 1px solid var(--borde); padding-bottom: 0.5rem; margin-bottom: 0.5rem; animation: fadeIn 0.5s ease; background: rgba(124,58,237,0.1);">
-                        <div class="flex between center mb-1">
-                            <strong>${comentario.autor}</strong>
-                            <span style="font-size:0.7rem; color:var(--texto-sec)">${new Date(comentario.createdAt).toLocaleDateString()} (Nuevo)</span>
-                        </div>
-                        <div style="font-size:0.85rem">${comentario.comentario}</div>
-                    </div>
-                `;
+                const html = this.renderComentarioHTML(comentario, true);
                 // Insertar al principio porque están ordenados de más recientes primero
                 lista.insertAdjacentHTML('afterbegin', html);
             }
         }
+    }
+
+    onActualizarComentarioRealtime(comentario) {
+        const el = document.getElementById(`comentario-${comentario._id}`);
+        if (el) {
+            const temp = document.createElement('div');
+            temp.innerHTML = this.renderComentarioHTML(comentario, false);
+            el.replaceWith(temp.firstElementChild);
+        }
+    }
+
+    renderComentarioHTML(c, isNuevo) {
+        let likesCount = c.likes ? c.likes.length : 0;
+        let dislikesCount = c.dislikes ? c.dislikes.length : 0;
+        let myId = this.usuario ? this.usuario.id : null;
+        let hasLiked = c.likes && c.likes.includes(myId);
+        let hasDisliked = c.dislikes && c.dislikes.includes(myId);
+
+        return `
+            <div id="comentario-${c._id}" style="border-bottom: 1px solid var(--borde); padding-bottom: 0.5rem; margin-bottom: 0.5rem; ${isNuevo ? 'animation: fadeIn 0.5s ease; background: rgba(124,58,237,0.1);' : ''}">
+                <div class="flex between center mb-1">
+                    <strong>${c.autor}</strong>
+                    <span style="font-size:0.7rem; color:var(--texto-sec)">${new Date(c.createdAt).toLocaleDateString()}${isNuevo ? ' (Nuevo)' : ''}</span>
+                </div>
+                <div style="font-size:0.85rem">${c.comentario}</div>
+                <div class="flex gap-1 mt-1">
+                    <button class="btn btn-secundario" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; ${hasLiked ? 'border-color: var(--verde); color: var(--verde);' : ''}" onclick="darLike('${c._id}')">
+                        Like ${likesCount}
+                    </button>
+                    <button class="btn btn-secundario" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; ${hasDisliked ? 'border-color: var(--rojo); color: var(--rojo);' : ''}" onclick="darDislike('${c._id}')">
+                        Dislike ${dislikesCount}
+                    </button>
+                </div>
+            </div>
+        `;
     }
 
     bindGlobalFunctions() {
@@ -130,6 +160,8 @@ class App {
         window.abrirComentarios = (pid, nombre) => this.abrirComentarios(pid, nombre);
         window.cerrarModalComentarios = () => this.cerrarModal('modal-comentarios');
         window.enviarComentario = () => this.enviarComentario();
+        window.darLike = (id) => this.darLike(id);
+        window.darDislike = (id) => this.darDislike(id);
         window.agregarAPlaylist = (pid, nombre, precio) => this.agregarAPlaylist(pid, nombre, precio);
         window.eliminarDePlaylist = (pid) => this.eliminarDePlaylist(pid);
         window.guardarDatosPlaylist = () => this.guardarDatosPlaylist();
@@ -700,15 +732,7 @@ class App {
             if (!comentarios || comentarios.length === 0) {
                 lista.innerHTML = '<div class="text-center" style="color:var(--texto-sec)">No hay comentarios aún. ¡Sé el primero!</div>';
             } else {
-                lista.innerHTML = comentarios.map(c => `
-                    <div style="border-bottom: 1px solid var(--borde); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
-                        <div class="flex between center mb-1">
-                            <strong>${c.autor}</strong>
-                            <span style="font-size:0.7rem; color:var(--texto-sec)">${new Date(c.createdAt).toLocaleDateString()}</span>
-                        </div>
-                        <div style="font-size:0.85rem">${c.comentario}</div>
-                    </div>
-                `).join('');
+                lista.innerHTML = comentarios.map(c => this.renderComentarioHTML(c, false)).join('');
             }
         } catch (err) {
             lista.innerHTML = '<div class="text-center" style="color:var(--rojo)">Error al cargar comentarios</div>';
@@ -737,6 +761,28 @@ class App {
             // No recargamos aquí manualmente, porque Socket.io lo insertará
         } catch (err) {
             this.toast('Error al enviar comentario', 'error');
+        }
+    }
+
+    async darLike(comentarioId) {
+        if (!this.usuario) return this.toast('Debes iniciar sesión para dar me gusta', 'error');
+        try {
+            await this.api.post(`/comentarios/${comentarioId}/like`, {
+                clienteId: this.usuario.id
+            });
+        } catch (err) {
+            this.toast('Error al procesar el like', 'error');
+        }
+    }
+
+    async darDislike(comentarioId) {
+        if (!this.usuario) return this.toast('Debes iniciar sesión para dar no me gusta', 'error');
+        try {
+            await this.api.post(`/comentarios/${comentarioId}/dislike`, {
+                clienteId: this.usuario.id
+            });
+        } catch (err) {
+            this.toast('Error al procesar el dislike', 'error');
         }
     }
 

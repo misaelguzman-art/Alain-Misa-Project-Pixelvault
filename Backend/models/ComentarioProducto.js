@@ -27,7 +27,15 @@ const comentarioProductoSchema = new mongoose.Schema({
         required: true,
         minLength: 1,
         description: 'Texto del comentario'
-    }
+    },
+    likes: [{
+        type: Number,
+        description: 'Arreglo de IDs de clientes que dieron Like'
+    }],
+    dislikes: [{
+        type: Number,
+        description: 'Arreglo de IDs de clientes que dieron Dislike'
+    }]
 }, { timestamps: true });
 
 module.exports = mongoose.model('ComentarioProducto', comentarioProductoSchema, 'ComentariosDeProductos');
