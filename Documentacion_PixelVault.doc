@@ -531,5 +531,34 @@ node server.js
     El frontend de PixelVault se cargará automáticamente en <code>http://localhost:3000</code>. Podrás cambiar dinámicamente de sucursal con el selector de país en la cabecera superior y administrar reportes globales, inventarios locales y realizar compras en tiempo real de forma totalmente distribuida.
 </p>
 
+<h2>6. Actualizaciones de Arquitectura (Fase 2: Red y Tiempo Real)</h2>
+<p>
+    Para llevar la experiencia distribuida al siguiente nivel, se implementaron sistemas de tiempo real y sincronización en red para evitar el aislamiento de datos entre sucursales.
+</p>
+
+<h3>6.1 Sincronización de Base de Datos NoSQL (MongoDB)</h3>
+<p>
+    Originalmente, MongoDB guardaba los comentarios y playlists en el <code>localhost</code> de cada máquina, creando un aislamiento total donde cada sucursal tenía comentarios diferentes. 
+    <br><br>
+    <strong>Solución:</strong> Se modificó el archivo de configuración <code>mongo_database.js</code> para que apunte directamente al Hostname del Nodo Central (Bolivia). Además, se configuró el archivo <code>mongod.cfg</code> en el servidor principal cambiando <code>bindIp: 127.0.0.1</code> a <code>bindIp: 0.0.0.0</code> y abriendo el puerto TCP <code>27017</code> en el Firewall. Esto permite que la sucursal de Perú lea y escriba comentarios sobre la misma base de datos física que Bolivia a través de la red local o VPN.
+</p>
+
+<h3>6.2 WebSockets y Comentarios en Vivo</h3>
+<p>
+    Se integró la librería <strong>Socket.IO</strong> tanto en el backend (Express) como en el frontend (Vanilla JS) para lograr interactividad instantánea sin necesidad de recargar la página.
+    <br><br>
+    Al guardar un comentario en MongoDB, el servidor emite un evento global <code>nuevo_comentario</code>. La clase <code>App</code> en el cliente captura este evento e inyecta dinámicamente el HTML del comentario en la interfaz, logrando que los usuarios en diferentes partes del mundo vean los mensajes aparecer instantáneamente al mismo tiempo.
+</p>
+
+<h3>6.3 Fusión de Catálogo Distribuido y Prevención de Colisiones de IDs</h3>
+<p>
+    En la primera arquitectura, la tienda sufría del problema de "Islas de Datos": Perú solo veía los juegos de Perú, y Bolivia solo los de Bolivia. 
+</p>
+<ul>
+    <li><strong>Reglas de Negocio Implementadas:</strong> Se modificó el endpoint <code>/juegos/todo</code> para consultar los Connection Pools de manera inteligente. Si un cliente entra como "Bolivia", el sistema carga la base de datos central. Si entra como "Perú", el sistema ejecuta dos consultas en paralelo: carga los juegos <strong>Locales</strong> de la base de datos de Perú y solicita a través de la red los juegos <strong>Globales</strong> de la base de datos de Bolivia.</li>
+    <li><strong>Inyección Dinámica de Ámbito:</strong> Las consultas originales SQL no devolvían la etiqueta de país. Se implementó una inyección en el Backend que asigna <code>pais_ambito: 'Global'</code> a los juegos traídos desde la central, y <code>'Peru'</code> a los traídos de la sucursal. El frontend detecta este ámbito y renderiza medallas de colores (Verde, Rojo, Amarillo) para indicar de dónde proviene el juego.</li>
+    <li><strong>Resolución de Colisión de Primary Keys (ID Clash):</strong> Al fusionar catálogos de bases de datos separadas (cada una con su propio autoincremental de <code>productid</code>), ocurrían conflictos de IDs (Ej: ID 1 en Perú y ID 1 en Bolivia). El algoritmo de deduplicación borraba los juegos globales por accidente. Se refactorizó el sistema para mapear la deduplicación usando un <code>Set</code> basado en el <code>nombre_juego</code>, garantizando la persistencia visual de todos los productos y solucionando el bug maestro.</li>
+</ul>
+
 </body>
 </html>
