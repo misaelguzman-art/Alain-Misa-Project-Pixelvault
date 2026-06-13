@@ -122,27 +122,41 @@ router.delete('/clientes/pagos', async (req, res) => {
 // CATÁLOGO Y PRODUCTOS
 // ============================================================
 
-// 8. Catálogo completo (juegos, ediciones, DLCs) - CONSOLIDADO DISTRIBUIDO
+// 8. Catálogo completo (juegos, ediciones, DLCs) - CONSOLIDADO DISTRIBUIDO (Solo Globales compartidos)
 router.get('/juegos/todo', async (req, res) => {
     try {
         const { poolBolivia, poolPeru } = require('./database');
+        const sucursal = (req.headers['x-pais'] || req.query.pais || 'bolivia').toLowerCase();
         let list = [];
         
-        // 1. Cargar juegos del nodo Central (Bolivia - Juegos Globales y Locales)
-        try {
+        if (sucursal === 'bolivia') {
+            // BOLIVIA ve: Sus juegos locales + Juegos Globales (que ya están en su propia BD)
             if (!poolBolivia.connected) await poolBolivia.connect();
             const resBolivia = await poolBolivia.request().execute('sp_mostrar_juegos_ED_DLC');
             list.push(...resBolivia.recordset);
-        } catch (e) { console.log('⚠️ No se pudo cargar el catálogo de Bolivia:', e.message); }
+        } else if (sucursal === 'peru') {
+            // PERÚ ve: Sus juegos locales (Perú) + Juegos Globales (desde Bolivia)
+            
+            // 1. Cargar juegos locales de Perú
+            try {
+                if (!poolPeru.connected) await poolPeru.connect();
+                const resPeru = await poolPeru.request().execute('sp_mostrar_juegos_ED_DLC');
+                list.push(...resPeru.recordset);
+            } catch (e) { console.log('⚠️ Error Perú:', e.message); }
 
-        // 2. Cargar juegos del nodo Sucursal (Perú - Juegos Locales)
-        try {
-            if (!poolPeru.connected) await poolPeru.connect();
-            const resPeru = await poolPeru.request().execute('sp_mostrar_juegos_ED_DLC');
-            list.push(...resPeru.recordset);
-        } catch (e) { console.log('⚠️ No se pudo cargar el catálogo de Perú:', e.message); }
+            // 2. Traer SOLO los juegos Globales desde Bolivia
+            try {
+                if (!poolBolivia.connected) await poolBolivia.connect();
+                const resBolivia = await poolBolivia.request().execute('sp_mostrar_juegos_ED_DLC');
+                // Filtrar para que solo pasen los que digan (Global)
+                const globalesDeBolivia = resBolivia.recordset.filter(j => 
+                    j.nombre_juego.toLowerCase().includes('(global)')
+                );
+                list.push(...globalesDeBolivia);
+            } catch (e) { console.log('⚠️ Error trayendo globales de Bolivia:', e.message); }
+        }
 
-        // 3. Eliminar duplicados (por si acaso un juego existiera en ambas bases de datos)
+        // Eliminar duplicados por si acaso
         const juegosUnicos = [];
         const idsVistos = new Set();
         for (const juego of list) {
