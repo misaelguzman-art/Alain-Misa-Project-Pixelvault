@@ -122,12 +122,37 @@ router.delete('/clientes/pagos', async (req, res) => {
 // CATÁLOGO Y PRODUCTOS
 // ============================================================
 
-// 8. Catálogo completo (juegos, ediciones, DLCs)
+// 8. Catálogo completo (juegos, ediciones, DLCs) - CONSOLIDADO DISTRIBUIDO
 router.get('/juegos/todo', async (req, res) => {
     try {
-        const pool = req.dbPool;
-        const result = await pool.request().execute('sp_mostrar_juegos_ED_DLC');
-        res.json(result.recordset);
+        const { poolBolivia, poolPeru } = require('./database');
+        let list = [];
+        
+        // 1. Cargar juegos del nodo Central (Bolivia - Juegos Globales y Locales)
+        try {
+            if (!poolBolivia.connected) await poolBolivia.connect();
+            const resBolivia = await poolBolivia.request().execute('sp_mostrar_juegos_ED_DLC');
+            list.push(...resBolivia.recordset);
+        } catch (e) { console.log('⚠️ No se pudo cargar el catálogo de Bolivia:', e.message); }
+
+        // 2. Cargar juegos del nodo Sucursal (Perú - Juegos Locales)
+        try {
+            if (!poolPeru.connected) await poolPeru.connect();
+            const resPeru = await poolPeru.request().execute('sp_mostrar_juegos_ED_DLC');
+            list.push(...resPeru.recordset);
+        } catch (e) { console.log('⚠️ No se pudo cargar el catálogo de Perú:', e.message); }
+
+        // 3. Eliminar duplicados (por si acaso un juego existiera en ambas bases de datos)
+        const juegosUnicos = [];
+        const idsVistos = new Set();
+        for (const juego of list) {
+            if (!idsVistos.has(juego.productid)) {
+                idsVistos.add(juego.productid);
+                juegosUnicos.push(juego);
+            }
+        }
+
+        res.json(juegosUnicos);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
