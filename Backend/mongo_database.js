@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 
-// URI de conexión a la base de datos local de MongoDB (por defecto en el puerto 27017)
-const MONGO_URI = 'mongodb://localhost:27017/BD2_tienda_mongo'; 
+// URI de conexión a la base de datos central de MongoDB (Hosteada en Bolivia)
+// Cambiado de 'localhost' a 'LAPTOP-GGCKNFU6' para que Perú pueda conectarse
+const MONGO_URI = 'mongodb://LAPTOP-GGCKNFU6:27017/BD2_tienda_mongo'; 
 
 const connectMongoDB = async () => {
     try {
